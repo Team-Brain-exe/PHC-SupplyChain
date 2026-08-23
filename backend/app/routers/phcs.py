@@ -5,7 +5,6 @@ from app.database import get_db
 from app.models.phc import PHC
 from app.schemas.phc import PHCOut, PHCCreate
 from app.services.risk_scoring import score_phc
-from app.services.risk_scoring import score_phc
 
 router = APIRouter(prefix="/phcs", tags=["phcs"])
 
@@ -30,23 +29,6 @@ def create_phc(phc: PHCCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_phc)
     return db_phc
-
-
-@router.get("/{phc_id}/risk")
-def get_phc_risk(phc_id: int, db: Session = Depends(get_db)):
-    phc = db.query(PHC).filter(PHC.id == phc_id).first()
-    if not phc:
-        raise HTTPException(status_code=404, detail="PHC not found")
-    result = score_phc(db, phc)
-    return result
-
-
-@router.get("/{phc_id}/risk")
-def get_phc_risk(phc_id: int, db: Session = Depends(get_db)):
-    phc = db.query(PHC).filter(PHC.id == phc_id).first()
-    if not phc:
-        raise HTTPException(status_code=404, detail="PHC not found")
-    return score_phc(db, phc)
 
 
 @router.get("/{phc_id}/risk")
