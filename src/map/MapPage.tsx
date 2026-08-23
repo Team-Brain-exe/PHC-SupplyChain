@@ -1,25 +1,27 @@
 // src/map/MapPage.tsx
 
-import { useEffect, useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
   Polyline,
   CircleMarker,
   Popup,
-  Tooltip,
   useMap,
 } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-import {
-  useVessels,
-  useAircraft,
-  useRiskCorridors,
-} from "../hooks/useLiveData";
+import type { PHC } from "../services/project44";
 
 type Severity = "critical" | "high" | "medium" | "low";
+
+function severityColor(sev: Severity): string {
+  if (sev === "critical") return "#ef4444";
+  if (sev === "high") return "#f59e0b";
+  if (sev === "medium") return "#f97316";
+  return "#22c55e";
+}
 
 function buildGraticule(): LatLngExpression[][] {
   const lines: LatLngExpression[][] = [];
@@ -68,24 +70,20 @@ function InvalidateMapSize() {
 }
 
 /**
- * The actual Leaflet map: tiles, graticule, risk corridors, live vessel/
- * aircraft markers, title/status/legend overlays. Reusable — fills
- * whatever parent container it's placed inside (width/height 100%,
- * minHeight 0, so it works in both the full-page Live Map and the
- * smaller Dashboard map panel).
+ * The actual Leaflet map: tiles, graticule, and PHC markers colored/
+ * sized by stock-out risk score. Reusable — fills whatever parent
+ * container it's placed inside (width/height 100%, minHeight 0, so it
+ * works in both the full-page Live Map and the smaller Dashboard map
+ * panel).
  */
-export function LiveMapCanvas() {
-  const { data: vessels, loading: vesselsLoading } = useVessels();
-  const {
-    data: aircraft,
-    loading: aircraftLoading,
-    error: aircraftError,
-  } = useAircraft();
-
-  const { data: corridors, loading: corridorsLoading } =
-    useRiskCorridors();
-
+export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
   const graticule = useMemo(buildGraticule, []);
+
+  const counts = useMemo(() => {
+    const c: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const p of phcs) c[p.risk]++;
+    return c;
+  }, [phcs]);
 
   return (
     <div
@@ -114,7 +112,7 @@ export function LiveMapCanvas() {
           color: "var(--text-3)",
         }}
       >
-        LIVE MAP · INDIA TRADE CORRIDORS
+        PHC NETWORK MAP · INDIA
       </div>
 
       {/* Live status */}
@@ -161,7 +159,7 @@ export function LiveMapCanvas() {
           </span>
         </div>
 
-        {(vesselsLoading || aircraftLoading || corridorsLoading) && (
+        {phcs.length === 0 && (
           <div
             className="mono"
             style={{
@@ -206,49 +204,36 @@ export function LiveMapCanvas() {
           RISK
         </span>
 
-        {(["critical", "high", "medium", "low"] as Severity[]).map(
-          (severity) => {
-            const color =
-              severity === "critical"
-                ? "#ef4444"
-                : severity === "high"
-                  ? "#f59e0b"
-                  : severity === "medium"
-                    ? "#f97316"
-                    : "#22c55e";
+        {(["critical", "high", "medium", "low"] as Severity[]).map((severity) => (
+          <span
+            key={severity}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: severityColor(severity),
+              }}
+            />
 
-            return (
-              <span
-                key={severity}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: color,
-                  }}
-                />
-
-                <span
-                  className="mono"
-                  style={{
-                    fontSize: 8,
-                    color: "var(--text-3)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {severity}
-                </span>
-              </span>
-            );
-          }
-        )}
+            <span
+              className="mono"
+              style={{
+                fontSize: 8,
+                color: "var(--text-3)",
+                textTransform: "uppercase",
+              }}
+            >
+              {severity} ({counts[severity]})
+            </span>
+          </span>
+        ))}
 
         <span
           style={{
@@ -265,50 +250,14 @@ export function LiveMapCanvas() {
             color: "#38bdf8",
           }}
         >
-          ● VESSELS {vessels.length}
-        </span>
-
-        <span
-          className="mono"
-          style={{
-            fontSize: 8,
-            color: "#a78bfa",
-          }}
-        >
-          ● AIRCRAFT {aircraft.length}
+          ● {phcs.length} PHCs MONITORED
         </span>
       </div>
 
-      {/* Error indicator */}
-      {aircraftError && (
-        <div
-          style={{
-            position: "absolute",
-            zIndex: 1000,
-            bottom: 14,
-            right: 14,
-            padding: "5px 8px",
-            background: "rgba(239,68,68,0.1)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            borderRadius: 4,
-          }}
-        >
-          <span
-            className="mono"
-            style={{
-              fontSize: 8,
-              color: "#ef4444",
-            }}
-          >
-            AIRCRAFT FEED ERROR
-          </span>
-        </div>
-      )}
-
       <MapContainer
-        center={[15, 70]}
-        zoom={3}
-        minZoom={2}
+        center={[22.9, 79.0]}
+        zoom={5}
+        minZoom={4}
         maxZoom={12}
         worldCopyJump={false}
         scrollWheelZoom={true}
@@ -339,103 +288,31 @@ export function LiveMapCanvas() {
           />
         ))}
 
-        {/* Risk corridors */}
-        {corridors.map((corridor) => {
-          const color =
-            corridor.severity === "critical"
-              ? "#ef4444"
-              : corridor.severity === "high"
-                ? "#f59e0b"
-                : corridor.severity === "medium"
-                  ? "#f97316"
-                  : "#22c55e";
-
-          return (
-            <Polyline
-              key={corridor.id}
-              positions={corridor.path}
-              pathOptions={{
-                color,
-                weight: 3,
-                opacity: 0.8,
-                dashArray: "8 8",
-              }}
-            >
-              <Tooltip sticky>
-                <strong>{corridor.name}</strong>
-                <br />
-                Risk: {corridor.severity.toUpperCase()}
-              </Tooltip>
-            </Polyline>
-          );
-        })}
-
-        {/* Live vessels */}
-        {vessels.map((vessel) => (
+        {/* PHC markers, sized and colored by stock-out risk score */}
+        {phcs.map((phc) => (
           <CircleMarker
-            key={`vessel-${vessel.mmsi}`}
-            center={[vessel.lat, vessel.lng]}
-            radius={6}
+            key={`phc-${phc.id}`}
+            center={[phc.lat, phc.lng]}
+            radius={6 + phc.score / 12}
             pathOptions={{
-              color: "#075985",
+              color: severityColor(phc.risk),
               weight: 1.5,
-              fillColor: "#38bdf8",
-              fillOpacity: 0.95,
+              fillColor: severityColor(phc.risk),
+              fillOpacity: 0.85,
             }}
           >
             <Popup>
-              <div style={{ minWidth: 150 }}>
-                <strong>{vessel.name}</strong>
-
-                <div>MMSI: {vessel.mmsi}</div>
+              <div style={{ minWidth: 160 }}>
+                <strong>{phc.name}</strong>
 
                 <div>
-                  Speed: {vessel.speedKnots.toFixed(1)} kn
+                  {phc.district}, {phc.state}
                 </div>
 
-                <div>
-                  Heading: {Math.round(vessel.heading)}°
-                </div>
-
-                {vessel.destination && (
-                  <div>
-                    Destination: {vessel.destination}
-                  </div>
-                )}
-              </div>
-            </Popup>
-          </CircleMarker>
-        ))}
-
-        {/* Live aircraft */}
-        {aircraft.map((plane) => (
-          <CircleMarker
-            key={`aircraft-${plane.icao24}`}
-            center={[plane.lat, plane.lng]}
-            radius={5}
-            pathOptions={{
-              color: "#5b21b6",
-              weight: 1.5,
-              fillColor: "#a78bfa",
-              fillOpacity: 0.95,
-            }}
-          >
-            <Popup>
-              <div style={{ minWidth: 150 }}>
-                <strong>{plane.callsign}</strong>
-
-                <div>ICAO24: {plane.icao24}</div>
+                <div>Type: {phc.type}{phc.isRemote ? " (remote)" : ""}</div>
 
                 <div>
-                  Altitude: {plane.altitudeFt.toLocaleString()} ft
-                </div>
-
-                <div>
-                  Speed: {plane.velocityKnots} kn
-                </div>
-
-                <div>
-                  Heading: {Math.round(plane.headingDeg)}°
+                  Risk score: {phc.score} ({phc.risk.toUpperCase()})
                 </div>
               </div>
             </Popup>
@@ -447,12 +324,20 @@ export function LiveMapCanvas() {
 }
 
 /**
- * Full Live Map page: LiveMapCanvas plus the right-side alert panel.
- * Unchanged in structure/behavior from before the refactor.
+ * Full Live Map page: LiveMapCanvas plus a right-side panel breaking
+ * down PHCs by state — supports the multi-state "reach across India"
+ * view alongside the map itself.
  */
-export default function MapPage() {
-  const { data: vessels } = useVessels();
-  const { data: aircraft } = useAircraft();
+export default function MapPage({ phcs }: { phcs: PHC[] }) {
+  const byState = useMemo(() => {
+    const map = new Map<string, PHC[]>();
+    for (const p of phcs) {
+      const list = map.get(p.state) ?? [];
+      list.push(p);
+      map.set(p.state, list);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [phcs]);
 
   return (
     <div
@@ -475,10 +360,10 @@ export default function MapPage() {
           overflow: "hidden",
         }}
       >
-        <LiveMapCanvas />
+        <LiveMapCanvas phcs={phcs} />
       </div>
 
-      {/* RIGHT ALERT PANEL */}
+      {/* RIGHT PANEL: PHCs by state */}
       <div
         style={{
           width: 260,
@@ -487,6 +372,7 @@ export default function MapPage() {
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
+          overflowY: "auto",
         }}
       >
         <div
@@ -500,48 +386,47 @@ export default function MapPage() {
             textTransform: "uppercase",
           }}
         >
-          Active Events
+          PHCs by State
         </div>
 
-        {/* Feed summary */}
-        <div
-          style={{
-            padding: "10px 14px",
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          <div
-            className="mono"
-            style={{
-              fontSize: 8,
-              color: "var(--text-3)",
-              marginBottom: 5,
-            }}
-          >
-            LIVE DATA SOURCES
-          </div>
+        {byState.map(([state, list]) => {
+          const avgScore = Math.round(list.reduce((sum, p) => sum + p.score, 0) / list.length);
+          return (
+            <div
+              key={state}
+              style={{
+                padding: "10px 14px",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  marginBottom: 3,
+                }}
+              >
+                {state}
+              </div>
 
-          <div
-            className="mono"
-            style={{
-              fontSize: 8,
-              color: "#38bdf8",
-              marginBottom: 3,
-            }}
-          >
-            AISSTREAM · {vessels.length} VESSELS
-          </div>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 8,
+                  color: "var(--text-3)",
+                }}
+              >
+                {list.length} PHC{list.length !== 1 ? "s" : ""} · avg risk {avgScore}
+              </div>
+            </div>
+          );
+        })}
 
-          <div
-            className="mono"
-            style={{
-              fontSize: 8,
-              color: "#a78bfa",
-            }}
-          >
-            OPENSKY · {aircraft.length} AIRCRAFT
+        {byState.length === 0 && (
+          <div style={{ padding: 20, textAlign: "center", fontSize: 11, color: "var(--text-3)" }}>
+            No PHC data loaded.
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -3,18 +3,19 @@ import LiveMapPage, { LiveMapCanvas } from "./map/MapPage"
 import {
   fetchDashboardData,
   dismissAlertApi,
-  setRouteWatchedApi,
-  applyRerouteApi,
-  dismissRerouteApi,
-  generateReroutesApi,
-  adaptReroute,
+  setPHCWatched,
+  applyRedistributionApi,
+  dismissRedistributionApi,
+  generateRedistributionsApi,
+  adaptRedistribution,
   notifyTeamApi,
   BACKEND_URL,
 } from "./services/project44"
+import type { ResourceStockView } from "./services/project44"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Severity = "critical" | "high" | "medium" | "low"
-type NavPage = "dashboard" | "map" | "planner" | "alerts" | "analytics" | "settings"
+type NavPage = "dashboard" | "map" | "stock" | "planner" | "alerts" | "analytics" | "settings"
 
 type AlertEvent = {
   id: number
@@ -28,25 +29,28 @@ type AlertEvent = {
   dismissed?: boolean
 }
 
-type Route = {
+type PHCEntry = {
   id: string
-  from: string
-  to: string
-  via: string
+  name: string
+  state: string
+  district: string
+  lat: number
+  lng: number
+  type: string
+  isRemote: boolean
   risk: Severity
   score: number
-  status: string
-  freight: string
-  delay: string
   watched: boolean
 }
 
-type Reroute = {
+type RedistributionEntry = {
   id: number
-  original: string
-  alt: string
-  via: string
-  extraDays: number
+  originPhcId: number
+  resourceType: string
+  fromPhc: string
+  toPhc: string
+  quantity: number
+  extraHours: number
   extraCost: string
   confidence: number
   reason: string
@@ -62,12 +66,7 @@ type MLScore = {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const STATS = [
-  { label: "India trade by sea", value: "95%", delta: null, sub: "of total volume" },
-  { label: "Freight spike (Red Sea)", value: "8×", delta: "+680%", sub: "vs pre-crisis avg" },
-  { label: "Exports affected Aug '24", value: "−9.3%", delta: "−9.3%", sub: "YoY contraction" },
-  { label: "Logistics cost / GDP", value: "7.97%", delta: null, sub: "down from 13% (2015)" },
-]
+
 
 const SEV_COLOR: Record<Severity, string> = {
   critical: "#ef4444",
@@ -91,30 +90,24 @@ function fmtAge(min: number) {
 
 const SEV_WEIGHT: Record<Severity, number> = { critical: 1.0, high: 0.75, medium: 0.5, low: 0.25 }
 
-const CHOKEPOINT_RISK: Record<string, number> = {
-  "Red Sea": 1.0,
-  "Suez Canal": 0.85,
-  "Colombo, Sri Lanka": 0.70,
-  "Malacca Strait": 0.60,
-  "Panama Canal": 0.55,
-  "Cape of Good Hope": 0.18,
-}
+// Remoteness stands in for the old shipping-chokepoint lookup: a remote
+// PHC is inherently harder/slower to resupply, so it carries higher
+// baseline risk the same way a chokepoint route did.
+const REMOTENESS_RISK = { remote: 0.75, standard: 0.30 }
 
 function sigmoid(x: number) {
   return 1 / (1 + Math.exp(-x))
 }
 
-function computeRiskScore(alert: AlertEvent, routes: Route[]): MLScore {
+function computeRiskScore(alert: AlertEvent, phcs: PHCEntry[]): MLScore {
   const sev = SEV_WEIGHT[alert.severity]
   // Recency feature: events < 2h score highest, decay over 10h
   const ageFactor = Math.max(0, 1 - alert.ageMin / 600)
-  // Route overlap: how many routes share endpoints with this alert
-  const parts = alert.route.split(" → ")
-  const from = parts[0] ?? ""
-  const to = parts[1] ?? ""
-  const overlapCount = routes.filter(r => r.from === from || r.to === to || r.via === alert.location).length
-  const overlap = overlapCount / Math.max(routes.length, 1)
-  const choke = CHOKEPOINT_RISK[alert.location] ?? 0.30
+  // District overlap: how many monitored PHCs share this alert's district
+  const overlapCount = phcs.filter(p => p.district === alert.route || p.name === alert.location).length
+  const overlap = overlapCount / Math.max(phcs.length, 1)
+  const matchedPhc = phcs.find(p => p.name === alert.location)
+  const choke = matchedPhc ? (matchedPhc.isRemote ? REMOTENESS_RISK.remote : REMOTENESS_RISK.standard) : REMOTENESS_RISK.standard
   const freight = sev * (choke * 0.9 + 0.1)
 
   // Weighted sum → sigmoid squash to 0–100
@@ -899,7 +892,7 @@ function RoutePlannerPage() {
           </style>
         </head>
         <body>
-          <h1>UNILOG Route Summary</h1>
+          <h1>PHC-Nexus Route Summary</h1>
           <div class="sub">${from} &rarr; ${to} &middot; ${cargo}</div>
           <table>
             <tr><td>Route</td><td>${opt.route}</td></tr>
@@ -1165,6 +1158,139 @@ function AlertsPage({ alerts, onDismiss, onNotify }: { alerts: AlertEvent[]; onD
   )
 }
 
+function stockSeverity(daysRemaining: number): Severity {
+  if (daysRemaining < 2) return "critical"
+  if (daysRemaining < 5) return "high"
+  if (daysRemaining < 10) return "medium"
+  return "low"
+}
+
+function StockPage({ stocks, phcs }: { stocks: ResourceStockView[]; phcs: PHCEntry[] }) {
+  const [stateFilter, setStateFilter] = useState<string>("all")
+  const phcById = new Map(phcs.map(p => [Number(p.id), p]))
+  const states = ["all", ...Array.from(new Set(phcs.map(p => p.state))).sort()]
+
+  const filtered = stocks.filter(s => {
+    if (stateFilter === "all") return true
+    const phc = phcById.get(s.phcId)
+    return phc?.state === stateFilter
+  })
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            color: "var(--text-3)",
+            textTransform: "uppercase",
+            marginRight: 8,
+          }}
+        >
+          State:
+        </span>
+        {states.map(s => (
+          <button
+            key={s}
+            onClick={() => setStateFilter(s)}
+            style={{
+              padding: "3px 10px",
+              fontSize: 9,
+              fontFamily: "DM Mono, monospace",
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              borderRadius: 3,
+              border: `1px solid ${stateFilter === s ? "var(--primary)60" : "var(--border)"}`,
+              background: stateFilter === s ? "var(--primary-dim)" : "transparent",
+              color: stateFilter === s ? "var(--primary)" : "var(--text-3)",
+              cursor: "pointer",
+              textTransform: "uppercase",
+            }}
+          >
+            {s}
+          </button>
+        ))}
+        <span className="mono" style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-3)" }}>
+          {filtered.length} records
+        </span>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        {filtered.map(s => {
+          const phc = phcById.get(s.phcId)
+          const sev = stockSeverity(s.daysRemaining)
+          const stockPct = s.capacity ? Math.round((s.units / s.capacity) * 100) : 0
+          const bedPct = s.bedTotal ? Math.round((s.bedOccupied / s.bedTotal) * 100) : 0
+          const staffPct = s.staffTotal ? Math.round((s.staffPresent / s.staffTotal) * 100) : 0
+          return (
+            <div
+              key={s.id}
+              style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", borderLeft: `2px solid ${SEV_COLOR[sev]}` }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{phc?.name ?? `PHC #${s.phcId}`}</span>
+                <span className="mono" style={{ fontSize: 9, color: "var(--text-3)" }}>
+                  {phc ? `${phc.district}, ${phc.state}` : ""}
+                </span>
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 8,
+                    letterSpacing: "0.1em",
+                    fontWeight: 600,
+                    padding: "1px 5px",
+                    background: SEV_BG[sev],
+                    color: SEV_COLOR[sev],
+                    borderRadius: 2,
+                  }}
+                >
+                  {s.category.toUpperCase()}
+                </span>
+                <span className="mono" style={{ marginLeft: "auto", fontSize: 9, color: SEV_COLOR[sev] }}>
+                  {s.daysRemaining.toFixed(1)}d of stock left
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                <div>
+                  <div className="mono" style={{ fontSize: 8, color: "var(--text-3)", marginBottom: 2 }}>
+                    STOCK {s.units}/{s.capacity} ({stockPct}%)
+                  </div>
+                  <div style={{ height: 4, background: "var(--panel-2)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ width: `${stockPct}%`, height: "100%", background: SEV_COLOR[sev] }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="mono" style={{ fontSize: 8, color: "var(--text-3)", marginBottom: 2 }}>
+                    BEDS {s.bedOccupied}/{s.bedTotal} ({bedPct}%)
+                  </div>
+                  <div style={{ height: 4, background: "var(--panel-2)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ width: `${bedPct}%`, height: "100%", background: "#38bdf8" }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="mono" style={{ fontSize: 8, color: "var(--text-3)", marginBottom: 2 }}>
+                    STAFF {s.staffPresent}/{s.staffTotal} ({staffPct}%)
+                  </div>
+                  <div style={{ height: 4, background: "var(--panel-2)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ width: `${staffPct}%`, height: "100%", background: "#a78bfa" }} />
+                  </div>
+                </div>
+              </div>
+              <div className="mono" style={{ fontSize: 9, color: "var(--text-3)", marginTop: 6 }}>
+                Footfall: {s.footfallDaily}/day · Updated {s.updatedAt}
+              </div>
+            </div>
+          )
+        })}
+        {filtered.length === 0 && (
+          <div style={{ padding: 40, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>No stock records for this filter.</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function SettingsPage() {
   const [notif, setNotif] = useState({ email: true, whatsapp: false, sms: true })
   const [thresh, setThresh] = useState<Severity>("high")
@@ -1294,11 +1420,11 @@ function SettingsPage() {
           Data Sources
         </div>
         {[
-          ["NewsAPI / GNews", "Active", "Connected"],
-          ["DGFT Trade Advisories", "Active", "Connected"],
-          ["OpenWeatherMap", "Active", "Connected"],
-          ["Port Authority Feeds", "Partial", "3/5 ports"],
-          ["Conflict Monitor", "Active", "Connected"],
+          ["Gemini AI (Redistribution Reasoning)", "Active", "Connected"],
+          ["scikit-learn Risk Model", "Active", "Connected"],
+          ["PHC Stock Reporting (HMIS)", "Partial", "4/6 states"],
+          ["Fast2SMS Notifications", "Active", "Connected"],
+          ["State Health Dept Feeds", "Partial", "2/6 states"],
         ].map(([name, status, detail]) => (
           <div
             key={name}
@@ -1378,8 +1504,8 @@ function DashboardView({
   setExpandedMLId,
 }: {
   alerts: AlertEvent[]
-  routes: Route[]
-  reroutes: Reroute[]
+  routes: PHCEntry[]
+  reroutes: RedistributionEntry[]
   activeAlert: number | null
   setActiveAlert: (id: number | null) => void
   onDismissAlert: (id: number) => void
@@ -1399,6 +1525,16 @@ function DashboardView({
   const [activeTab, setActiveTab] = useState<"alerts" | "watchlist">("alerts")
   const liveAlerts = alerts.filter(a => !a.dismissed)
 
+  const statesCovered = new Set(routes.map(r => r.state)).size
+  const criticalPhcs = routes.filter(r => r.risk === "critical").length
+  const avgRiskScore = routes.length ? Math.round(routes.reduce((sum, r) => sum + r.score, 0) / routes.length) : 0
+  const dashboardStats = [
+    { label: "PHCs Monitored", value: String(routes.length), delta: null, sub: "in network" },
+    { label: "States Covered", value: String(statesCovered), delta: null, sub: "across India" },
+    { label: "Active Stock-Outs", value: String(criticalPhcs), delta: null, sub: "critical risk" },
+    { label: "Avg Risk Score", value: String(avgRiskScore), delta: null, sub: "0–100 scale" },
+  ]
+
   return (
     <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
       {/* Left column: map, stats, tabs, list */}
@@ -1414,7 +1550,7 @@ function DashboardView({
               overflow: "hidden",
             }}
           >
-            <LiveMapCanvas />
+            <LiveMapCanvas phcs={routes} />
           </div>
           {mlRunning && (
             <div style={{ position: "absolute", top: 44, right: 12 }}>
@@ -1449,7 +1585,7 @@ function DashboardView({
 
         {/* Stats row */}
         <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-          {STATS.map((s, i) => {
+          {dashboardStats.map((s, i) => {
             const isNeg = s.delta?.startsWith("−") || s.delta?.startsWith("-")
             return (
               <div key={i} style={{ padding: "10px 14px", borderRight: "1px solid var(--border)", flex: 1 }}>
@@ -1501,7 +1637,7 @@ function DashboardView({
                 fontFamily: "DM Mono, monospace",
               }}
             >
-              {tab === "alerts" ? `Disruption Alerts (${liveAlerts.length})` : `Route Watchlist (${routes.filter(r => r.watched).length})`}
+              {tab === "alerts" ? `Health Alerts (${liveAlerts.length})` : `PHC Watchlist (${routes.filter(r => r.watched).length})`}
             </button>
           ))}
         </div>
@@ -1614,14 +1750,12 @@ function DashboardView({
                 >
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                      <span style={{ fontSize: 11, fontWeight: 600 }}>{r.from}</span>
-                      <span style={{ color: "var(--text-3)", fontSize: 10 }}>→</span>
-                      <span style={{ fontSize: 11, fontWeight: 600 }}>{r.to}</span>
-                      <span style={{ fontSize: 9, color: "var(--text-3)", fontStyle: "italic" }}>via {r.via}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600 }}>{r.name}</span>
+                      <span style={{ fontSize: 9, color: "var(--text-3)", fontStyle: "italic" }}>{r.district}, {r.state}</span>
                     </div>
                     <RiskBar score={r.score} sev={r.risk} />
                     <div className="mono" style={{ fontSize: 9, color: "var(--text-3)", marginTop: 3 }}>
-                      {r.freight} · delay {r.delay}
+                      {r.type} · {r.isRemote ? "remote" : "accessible"}
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 5, alignItems: "flex-end" }}>
@@ -1637,7 +1771,7 @@ function DashboardView({
                         borderRadius: 2,
                       }}
                     >
-                      {r.status}
+                      {r.risk.toUpperCase()}
                     </span>
                     <button
                       onClick={() => onToggleWatch(r.id)}
@@ -1660,11 +1794,11 @@ function DashboardView({
         </div>
       </div>
 
-      {/* Right: AI Rerouting + ML Panel */}
+      {/* Right: AI Redistribution + ML Panel */}
       <div style={{ width: 300, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", flexShrink: 0, background: "var(--panel)" }}>
         <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-2)", textTransform: "uppercase" }}>
-            AI Rerouting
+            AI Redistribution
           </span>
           <span className="mono" style={{ marginLeft: "auto", fontSize: 9, color: "#22c55e" }}>
             {reroutes.filter(r => !r.applied && !r.dismissed).length} suggestions
@@ -1716,21 +1850,18 @@ function DashboardView({
                     {rr.confidence}% conf.
                   </span>
                 </div>
-                <div className="mono" style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 2, textDecoration: "line-through" }}>
-                  {rr.original}
+                <div className="mono" style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 2 }}>
+                  {rr.resourceType} · {rr.quantity} units
                 </div>
                 <div className="mono" style={{ fontSize: 10, color: "var(--text)", fontWeight: 500, marginBottom: 4 }}>
-                  {rr.alt}
+                  {rr.fromPhc} → {rr.toPhc}
                 </div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                   <span className="mono" style={{ fontSize: 9, color: "#f59e0b" }}>
-                    +{rr.extraDays}d
+                    +{rr.extraHours}h
                   </span>
                   <span className="mono" style={{ fontSize: 9, color: "#f59e0b" }}>
                     {rr.extraCost}
-                  </span>
-                  <span className="mono" style={{ fontSize: 9, color: "var(--text-3)" }}>
-                    via {rr.via}
                   </span>
                 </div>
                 <div style={{ fontSize: 10, color: "var(--text-3)", lineHeight: 1.5, marginBottom: rr.applied ? 0 : 10 }}>{rr.reason}</div>
@@ -1950,8 +2081,9 @@ export default function App() {
   const [page, setPage] = useState<NavPage>("dashboard")
   const [activeAlert, setActiveAlert] = useState<number | null>(1)
   const [alerts, setAlerts] = useState<AlertEvent[]>([])
-  const [routes, setRoutes] = useState<Route[]>([])
-  const [reroutes, setReroutes] = useState<Reroute[]>([])
+  const [routes, setRoutes] = useState<PHCEntry[]>([])
+  const [reroutes, setReroutes] = useState<RedistributionEntry[]>([])
+  const [stocks, setStocks] = useState<ResourceStockView[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [dataError, setDataError] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState("")
@@ -1987,8 +2119,9 @@ export default function App() {
       .then(data => {
         if (cancelled) return
         setAlerts(data.alerts)
-        setRoutes(data.routes)
-        setReroutes(data.reroutes)
+        setRoutes(data.phcs)
+        setReroutes(data.redistributions)
+        setStocks(data.stocks)
         setDataError(null)
       })
       .catch(err => {
@@ -2083,7 +2216,7 @@ export default function App() {
       const next = prev.map(r => (r.id === id ? { ...r, watched: !r.watched } : r))
       const updated = next.find(r => r.id === id)
       if (updated) {
-        setRouteWatchedApi(id, updated.watched).catch(err => console.error("Failed to update watch on server:", err))
+        setPHCWatched(id, updated.watched)
       }
       return next
     })
@@ -2091,12 +2224,12 @@ export default function App() {
 
   const applyReroute = (id: number) => {
     setReroutes(prev => prev.map(r => (r.id === id ? { ...r, applied: true } : r)))
-    applyRerouteApi(id).catch(err => console.error("Failed to apply reroute on server:", err))
+    applyRedistributionApi(id).catch(err => console.error("Failed to apply redistribution on server:", err))
   }
 
   const dismissReroute = (id: number) => {
     setReroutes(prev => prev.map(r => (r.id === id ? { ...r, dismissed: true } : r)))
-    dismissRerouteApi(id).catch(err => console.error("Failed to dismiss reroute on server:", err))
+    dismissRedistributionApi(id).catch(err => console.error("Failed to dismiss redistribution on server:", err))
   }
 
   const generateSuggestions = async () => {
@@ -2105,12 +2238,12 @@ export default function App() {
     try {
       const targets = routes.filter(r => r.risk === "critical" || r.risk === "high")
       const results = await Promise.all(
-        targets.map(r => generateReroutesApi(r.id).catch(err => {
-          console.error(`Failed to generate reroutes for route ${r.id}:`, err)
-          return [] as Awaited<ReturnType<typeof generateReroutesApi>>
+        targets.map(r => generateRedistributionsApi(r.id).catch(err => {
+          console.error(`Failed to generate redistributions for PHC ${r.id}:`, err)
+          return [] as Awaited<ReturnType<typeof generateRedistributionsApi>>
         }))
       )
-      const newReroutes = results.flat().map(rr => adaptReroute(rr, new Map()))
+      const newReroutes = results.flat().map(rr => adaptRedistribution(rr))
       setReroutes(prev => {
         const existingIds = new Set(prev.map(r => r.id))
         const deduped = newReroutes.filter(r => !existingIds.has(r.id))
@@ -2160,9 +2293,9 @@ export default function App() {
               justifyContent: "center",
             }}
           >
-            <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "DM Mono, monospace" }}>U</span>
+            <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "DM Mono, monospace" }}>P</span>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>UNILOG</span>
+          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>PHC-Nexus</span>
           <span style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.1em", fontWeight: 600 }}>SUPPLY CHAIN INTELLIGENCE</span>
         </div>
 
@@ -2200,7 +2333,7 @@ export default function App() {
               }}
             />
             <span className="mono" style={{ fontSize: 10, color: "#ef4444" }}>
-              {liveCount} ACTIVE DISRUPTIONS
+              {liveCount} ACTIVE ALERTS
             </span>
           </button>
         )}
@@ -2446,7 +2579,8 @@ export default function App() {
             setExpandedMLId={setExpandedMLId}
           />
         )}
-        {page === "map" && <LiveMapPage />}
+        {page === "map" && <LiveMapPage phcs={routes} />}
+        {page === "stock" && <StockPage stocks={stocks} phcs={routes} />}
         {page === "planner" && <RoutePlannerPage />}
         {page === "alerts" && <AlertsPage alerts={alerts} onDismiss={dismissAlert} onNotify={notifyTeam} />}
         {page === "analytics" && <AnalyticsPage />}
