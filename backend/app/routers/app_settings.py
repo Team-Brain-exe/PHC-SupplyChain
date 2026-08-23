@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models.app_settings import AppSettings
 from app.models.phc import PHC
 from app.models.resource_stock import ResourceStock
+from app.models.user_device import UserDevice
 from app.schemas.app_settings import AppSettingsOut, AppSettingsUpdate
 from app.services.live_simulator import scheduler as live_scheduler
 
@@ -30,11 +31,38 @@ def get_settings(db: Session = Depends(get_db)):
     return _get_or_create(db)
 
 
+PRIMARY_DEVICE_LABEL = "Primary Contact"
+
+
+def _sync_primary_device(db: Session, settings: AppSettings) -> None:
+    """
+    Keeps a single UserDevice row ("Primary Contact") pointed at whatever
+    phone number is saved in Settings, so /notifications/send actually
+    reaches the person using the app rather than a hardcoded seed number.
+    Active only when a phone number is set AND the SMS toggle is on.
+    """
+    device = db.query(UserDevice).filter(UserDevice.label == PRIMARY_DEVICE_LABEL).first()
+    phone = (settings.contact_phone or "").strip()
+
+    if not phone:
+        if device:
+            device.active = False
+        return
+
+    if not device:
+        device = UserDevice(label=PRIMARY_DEVICE_LABEL, phone_number=phone, active=settings.notif_sms)
+        db.add(device)
+    else:
+        device.phone_number = phone
+        device.active = settings.notif_sms
+
+
 @router.patch("", response_model=AppSettingsOut)
 def update_settings(update: AppSettingsUpdate, db: Session = Depends(get_db)):
     settings = _get_or_create(db)
     for field, value in update.model_dump(exclude_unset=True).items():
         setattr(settings, field, value)
+    _sync_primary_device(db, settings)
     db.commit()
     db.refresh(settings)
     return settings
