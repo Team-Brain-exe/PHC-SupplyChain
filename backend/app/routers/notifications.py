@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.alert import Alert
+from app.models.health_alert import HealthAlert
 from app.models.user_device import UserDevice
 from app.models.notification import Notification
 from app.schemas.notification import NotificationOut, NotificationSendRequest
@@ -18,7 +18,7 @@ def list_notifications(db: Session = Depends(get_db)):
 
 @router.post("/send", response_model=list[NotificationOut])
 def send_notification(payload: NotificationSendRequest, db: Session = Depends(get_db)):
-    alert = db.query(Alert).filter(Alert.id == payload.alert_id).first()
+    alert = db.query(HealthAlert).filter(HealthAlert.id == payload.alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
 
