@@ -492,232 +492,108 @@ function WorldMap({
 
 // ─── Analytics Page ───────────────────────────────────────────────────────────
 
-function AnalyticsPage() {
-  const [period, setPeriod] = useState<"7d" | "30d" | "90d">("30d")
+// Replaces the old shipping/freight AnalyticsPage. Everything here is
+// derived from real props (alerts, stocks, phcs, reroutes) — nothing hardcoded.
+function AnalyticsPage({
+  alerts,
+  stocks,
+  phcs,
+  reroutes,
+}: {
+  alerts: AlertEvent[]
+  stocks: ResourceStockView[]
+  phcs: PHCEntry[]
+  reroutes: RedistributionEntry[]
+}) {
+  const typeCounts: Record<string, number> = {}
+  alerts.forEach(a => {
+    typeCounts[a.type] = (typeCounts[a.type] || 0) + 1
+  })
+  const typeBars = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])
+  const maxTypeBar = Math.max(1, ...typeBars.map(([, c]) => c))
 
-  const barData = [
-    { label: "Conflict", count: 18, sev: "critical" as Severity },
-    { label: "Port Strike", count: 7, sev: "high" as Severity },
-    { label: "Weather", count: 24, sev: "medium" as Severity },
-    { label: "Sanctions", count: 11, sev: "high" as Severity },
-    { label: "Canal", count: 5, sev: "medium" as Severity },
-    { label: "Tariff", count: 9, sev: "low" as Severity },
-  ]
-  const maxBar = Math.max(...barData.map(d => d.count))
+  const byCategory: Record<string, number[]> = {}
+  stocks.forEach(s => {
+    if (!byCategory[s.category]) byCategory[s.category] = []
+    byCategory[s.category].push(s.daysRemaining)
+  })
+  const categoryAverages = Object.entries(byCategory)
+    .map(([cat, vals]) => ({ cat, avg: vals.reduce((a, b) => a + b, 0) / vals.length }))
+    .sort((a, b) => a.avg - b.avg)
 
-  // Freight rate history (USD/TEU): Dec → Aug
-  const freightHistory = [500, 680, 900, 1500, 2800, 4000, 3800]
-  const allMonthLabels = ["Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"]
-  const xs = freightHistory.map((_, i) => i)
-  const reg = linearRegression(xs, freightHistory)
-  const forecasted = [7, 8, 9].map(x => Math.max(200, Math.round(reg.slope * x + reg.intercept)))
+  const byState: Record<string, PHCEntry[]> = {}
+  phcs.forEach(p => {
+    if (!byState[p.state]) byState[p.state] = []
+    byState[p.state].push(p)
+  })
+  const stateRows = Object.entries(byState)
+    .map(([state, list]) => ({
+      state,
+      count: list.length,
+      avgScore: Math.round(list.reduce((a, p) => a + p.score, 0) / list.length),
+      critical: list.filter(p => p.risk === "critical").length,
+    }))
+    .sort((a, b) => b.avgScore - a.avgScore)
 
-  const zScores = zScoreAnomalies(freightHistory)
-  const anomalyThreshold = 1.5
-
-  // SVG coordinate helpers
-  const allVals = [...freightHistory, ...forecasted]
-  const minVal = Math.min(...allVals)
-  const maxVal = Math.max(...allVals)
-  const toY = (v: number) => 10 + (1 - (v - minVal) / (maxVal - minVal || 1)) * 72
-
-  const xStep = 30
-  const histPoints = freightHistory.map((v, i) => ({ x: i * xStep, y: toY(v) }))
-  const forecastPoints = forecasted.map((v, i) => ({ x: (freightHistory.length + i) * xStep, y: toY(v) }))
-  const svgW = (allMonthLabels.length - 1) * xStep + 24
-
-  const histPath = histPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ")
-  const forecastPath = [histPoints[histPoints.length - 1], ...forecastPoints]
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
-    .join(" ")
-
-  const corridors = [
-    { name: "JNPT → Rotterdam", disruptions: 14, avgDelay: "16d", freightDelta: "+680%", trend: "up" },
-    { name: "Kolkata → Hamburg", disruptions: 11, avgDelay: "21d", freightDelta: "+580%", trend: "up" },
-    { name: "Chennai → Singapore", disruptions: 6, avgDelay: "4d", freightDelta: "+95%", trend: "stable" },
-    { name: "Mundra → Shanghai", disruptions: 4, avgDelay: "2d", freightDelta: "+42%", trend: "stable" },
-    { name: "Cochin → Jeddah", disruptions: 1, avgDelay: "—", freightDelta: "+12%", trend: "down" },
-  ]
+  const totalSuggestions = reroutes.length
+  const applied = reroutes.filter(r => r.applied).length
+  const avgConfidence = totalSuggestions
+    ? Math.round(reroutes.reduce((a, r) => a + r.confidence, 0) / totalSuggestions)
+    : 0
 
   return (
     <div style={{ padding: 24, overflowY: "auto", height: "100%" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>Analytics</h2>
-        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-          {(["7d", "30d", "90d"] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                padding: "4px 12px",
-                fontSize: 10,
-                fontFamily: "DM Mono, monospace",
-                background: period === p ? "var(--primary-dim)" : "transparent",
-                color: period === p ? "var(--primary)" : "var(--text-3)",
-                border: `1px solid ${period === p ? "var(--primary)40" : "var(--border)"}`,
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Analytics</h2>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        {/* Bar chart */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 6, padding: 16 }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              color: "var(--text-3)",
-              textTransform: "uppercase",
-              marginBottom: 14,
-            }}
-          >
-            Disruptions by Type · {period}
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-3)", textTransform: "uppercase", marginBottom: 14 }}>
+            Active Alerts by Type
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 120 }}>
-            {barData.map(d => (
-              <div key={d.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <span className="mono" style={{ fontSize: 9, color: SEV_COLOR[d.sev] }}>
-                  {d.count}
-                </span>
-                <div
-                  style={{
-                    width: "100%",
-                    height: `${(d.count / maxBar) * 90}px`,
-                    background: SEV_COLOR[d.sev],
-                    opacity: 0.75,
-                    borderRadius: "3px 3px 0 0",
-                    transition: "height 0.4s ease",
-                  }}
-                />
-                <span style={{ fontSize: 8, color: "var(--text-3)", textAlign: "center" }}>{d.label}</span>
-              </div>
-            ))}
-          </div>
+          {typeBars.length === 0 ? (
+            <div style={{ fontSize: 11, color: "var(--text-3)" }}>No alerts recorded.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {typeBars.map(([type, count]) => (
+                <div key={type} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 9, color: "var(--text-3)", width: 100 }}>{type}</span>
+                  <div style={{ flex: 1, height: 8, background: "var(--panel-2)", borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ width: `${(count / maxTypeBar) * 100}%`, height: "100%", background: "var(--primary)", opacity: 0.75 }} />
+                  </div>
+                  <span className="mono" style={{ fontSize: 9, color: "var(--text-2)", width: 20, textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Freight chart with LR forecast */}
         <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 6, padding: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                color: "var(--text-3)",
-                textTransform: "uppercase",
-              }}
-            >
-              Freight Rate · Kolkata–Rotterdam
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-3)", textTransform: "uppercase", marginBottom: 14 }}>
+            Avg Days of Stock Remaining
+          </div>
+          {categoryAverages.length === 0 ? (
+            <div style={{ fontSize: 11, color: "var(--text-3)" }}>No stock records available.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {categoryAverages.map(({ cat, avg }) => {
+                const sev = stockSeverity(avg)
+                return (
+                  <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 9, color: "var(--text-3)", width: 100 }}>{cat}</span>
+                    <div style={{ flex: 1, height: 8, background: "var(--panel-2)", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min(100, (avg / 14) * 100)}%`, height: "100%", background: SEV_COLOR[sev] }} />
+                    </div>
+                    <span className="mono" style={{ fontSize: 9, color: SEV_COLOR[sev], width: 34, textAlign: "right" }}>
+                      {avg.toFixed(1)}d
+                    </span>
+                  </div>
+                )
+              })}
             </div>
-            <span
-              className="mono"
-              style={{
-                marginLeft: "auto",
-                fontSize: 8,
-                color: "var(--primary)",
-                padding: "1px 5px",
-                background: "var(--primary-dim)",
-                borderRadius: 2,
-              }}
-            >
-              LR R²={reg.r2.toFixed(2)}
-            </span>
-          </div>
-          <div style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 8 }}>
-            Forecast Sep–Nov:{" "}
-            <span className="mono" style={{ color: "var(--primary)" }}>
-              ${forecasted[0].toLocaleString()}→${forecasted[2].toLocaleString()}/TEU
-            </span>
-            <span style={{ marginLeft: 6, color: reg.slope < 0 ? "#22c55e" : "#f59e0b" }}>
-              {reg.slope < 0 ? "↓ easing" : "↑ rising"}
-            </span>
-          </div>
-          <svg viewBox={`0 0 ${svgW} 108`} style={{ width: "100%", height: 108 }}>
-            <defs>
-              <linearGradient id="hist-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
-              </linearGradient>
-              <linearGradient id="fore-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#00d4ff" stopOpacity="0.12" />
-                <stop offset="100%" stopColor="#00d4ff" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-
-            {/* Grid */}
-            {[0.25, 0.5, 0.75].map(t => (
-              <line key={t} x1="0" y1={10 + t * 72} x2={svgW} y2={10 + t * 72} stroke="#1a2d42" strokeWidth="0.5" />
-            ))}
-
-            {/* Historical fill */}
-            <path d={`${histPath} L${histPoints[histPoints.length - 1].x},88 L0,88 Z`} fill="url(#hist-fill)" />
-            {/* Forecast fill */}
-            <path
-              d={`${forecastPath} L${forecastPoints[forecastPoints.length - 1].x},88 L${histPoints[histPoints.length - 1].x},88 Z`}
-              fill="url(#fore-fill)"
-            />
-
-            {/* Lines */}
-            <path d={histPath} fill="none" stroke="#ef4444" strokeWidth="2" />
-            <path d={forecastPath} fill="none" stroke="#00d4ff" strokeWidth="1.5" strokeDasharray="5,3" />
-
-            {/* Separator */}
-            <line
-              x1={histPoints[histPoints.length - 1].x}
-              y1="8"
-              x2={histPoints[histPoints.length - 1].x}
-              y2="88"
-              stroke="#243447"
-              strokeWidth="1"
-              strokeDasharray="3,2"
-            />
-            <text x={histPoints[histPoints.length - 1].x + 2} y="16" fill="#4d6480" fontSize="6" fontFamily="DM Mono, monospace">
-              → FORECAST
-            </text>
-
-            {/* Historical dots with anomaly markers */}
-            {histPoints.map((p, i) => {
-              const isAnomaly = zScores[i] > anomalyThreshold
-              return (
-                <g key={i}>
-                  {isAnomaly && <circle cx={p.x} cy={p.y} r="7" fill="none" stroke="#f59e0b" strokeWidth="1" opacity="0.6" />}
-                  <circle cx={p.x} cy={p.y} r={isAnomaly ? 3.5 : 2.5} fill={isAnomaly ? "#f59e0b" : "#ef4444"} />
-                  <text x={p.x} y="101" fill="#4d6480" fontSize="6.5" textAnchor="middle" fontFamily="DM Mono, monospace">
-                    {allMonthLabels[i]}
-                  </text>
-                </g>
-              )
-            })}
-
-            {/* Forecast dots */}
-            {forecastPoints.map((p, i) => (
-              <g key={`f${i}`}>
-                <circle cx={p.x} cy={p.y} r="2.5" fill="#00d4ff" opacity="0.75" />
-                <text x={p.x} y="101" fill="#4d6480" fontSize="6.5" textAnchor="middle" fontFamily="DM Mono, monospace">
-                  {allMonthLabels[freightHistory.length + i]}
-                </text>
-              </g>
-            ))}
-
-            {/* Y-axis */}
-            <text x="2" y="87" fill="#4d6480" fontSize="6.5" fontFamily="DM Mono, monospace">${minVal}</text>
-            <text x="2" y="17" fill="#4d6480" fontSize="6.5" fontFamily="DM Mono, monospace">${(maxVal / 1000).toFixed(1)}k</text>
-
-            {/* Anomaly legend dot */}
-            <circle cx={svgW - 46} cy="20" r="3.5" fill="#f59e0b" opacity="0.9" />
-            <text x={svgW - 40} y="24" fill="#4d6480" fontSize="6" fontFamily="DM Mono, monospace">ANOMALY</text>
-          </svg>
+          )}
         </div>
       </div>
 
-      {/* Z-score strip */}
       <div
         style={{
           background: "var(--panel)",
@@ -727,109 +603,44 @@ function AnalyticsPage() {
           marginBottom: 16,
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: 20,
           flexWrap: "wrap",
         }}
       >
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: "0.1em",
-            color: "var(--text-3)",
-            textTransform: "uppercase",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Z-Score Anomaly · Freight
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-3)", textTransform: "uppercase" }}>
+          Redistribution Activity
         </span>
-        {freightHistory.map((_, i) => {
-          const z = zScores[i]
-          const isA = z > anomalyThreshold
-          return (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-              <span className="mono" style={{ fontSize: 8, color: isA ? "#f59e0b" : "var(--text-3)", fontWeight: isA ? 700 : 400 }}>
-                z={z.toFixed(1)}
-              </span>
-              <span style={{ fontSize: 7, color: "var(--text-3)" }}>{allMonthLabels[i]}</span>
-            </div>
-          )
-        })}
-        <span className="mono" style={{ marginLeft: "auto", fontSize: 9, color: "#f59e0b" }}>
-          {zScores.filter(z => z > anomalyThreshold).length} anomalies detected
-        </span>
+        <span className="mono" style={{ fontSize: 11, color: "var(--text)" }}>{totalSuggestions} suggested</span>
+        <span className="mono" style={{ fontSize: 11, color: "#22c55e" }}>{applied} applied</span>
+        <span className="mono" style={{ fontSize: 11, color: "var(--primary)" }}>{avgConfidence}% avg confidence</span>
       </div>
 
-      {/* Corridor table */}
       <div style={{ background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 6, overflow: "hidden" }}>
-        <div
-          style={{
-            padding: "10px 16px",
-            borderBottom: "1px solid var(--border)",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.1em",
-            color: "var(--text-3)",
-            textTransform: "uppercase",
-          }}
-        >
-          Corridor Performance
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-3)", textTransform: "uppercase" }}>
+          Risk by State
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>
-              {["Corridor", "Disruptions", "Avg Delay", "Freight Δ", "Trend"].map(h => (
-                <th
-                  key={h}
-                  style={{
-                    padding: "8px 16px",
-                    fontSize: 9,
-                    color: "var(--text-3)",
-                    fontFamily: "DM Mono, monospace",
-                    letterSpacing: "0.08em",
-                    textAlign: "left",
-                    fontWeight: 600,
-                  }}
-                >
+              {["State", "Facilities", "Avg Risk Score", "Critical"].map(h => (
+                <th key={h} style={{ padding: "8px 16px", fontSize: 9, color: "var(--text-3)", fontFamily: "DM Mono, monospace", letterSpacing: "0.08em", textAlign: "left", fontWeight: 600 }}>
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {corridors.map((c, i) => (
-              <tr
-                key={i}
-                style={{
-                  borderBottom: "1px solid var(--border)",
-                  background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
-                }}
-              >
-                <td style={{ padding: "8px 16px", fontSize: 11, color: "var(--text)", fontWeight: 500 }}>{c.name}</td>
-                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: "var(--text-2)" }}>
-                  {c.disruptions}
-                </td>
-                <td
-                  className="mono"
-                  style={{ padding: "8px 16px", fontSize: 11, color: c.avgDelay === "—" ? "var(--text-3)" : "#f59e0b" }}
-                >
-                  {c.avgDelay}
-                </td>
-                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: "#ef4444" }}>
-                  {c.freightDelta}
-                </td>
-                <td style={{ padding: "8px 16px" }}>
-                  <span
-                    style={{
-                      fontSize: 14,
-                      color: c.trend === "up" ? "#ef4444" : c.trend === "down" ? "#22c55e" : "#f59e0b",
-                    }}
-                  >
-                    {c.trend === "up" ? "↑" : c.trend === "down" ? "↓" : "→"}
-                  </span>
-                </td>
+            {stateRows.map((row, i) => (
+              <tr key={row.state} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                <td style={{ padding: "8px 16px", fontSize: 11, color: "var(--text)", fontWeight: 500 }}>{row.state}</td>
+                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: "var(--text-2)" }}>{row.count}</td>
+                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: row.avgScore >= 65 ? "#ef4444" : "var(--text-2)" }}>{row.avgScore}</td>
+                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: row.critical > 0 ? "#ef4444" : "var(--text-3)" }}>{row.critical}</td>
               </tr>
             ))}
+            {stateRows.length === 0 && (
+              <tr><td colSpan={4} style={{ padding: 24, textAlign: "center", color: "var(--text-3)", fontSize: 11 }}>No PHC data available.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -837,71 +648,70 @@ function AnalyticsPage() {
   )
 }
 
-function RoutePlannerPage() {
-  const [from, setFrom] = useState("JNPT")
-  const [to, setTo] = useState("Rotterdam")
-  const [cargo, setCargo] = useState("General Cargo")
-  const [planned, setPlanned] = useState(false)
-  const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
 
-  const ports = ["JNPT", "Mundra", "Chennai", "Kolkata", "Cochin"]
-  const destinations = ["Rotterdam", "Hamburg", "Shanghai", "Singapore", "Los Angeles", "Jeddah"]
-  const cargoTypes = ["General Cargo", "Basmati Rice", "Petroleum", "Textiles", "Chemicals", "Machinery"]
+function RoutePlannerPage({
+  phcs,
+  reroutes,
+  onGenerateForPhc,
+  generatingPhcId,
+  onApplyReroute,
+  onDismissReroute,
+}: {
+  phcs: PHCEntry[]
+  reroutes: RedistributionEntry[]
+  onGenerateForPhc: (phcId: string) => Promise<void>
+  generatingPhcId: string | null
+  onApplyReroute: (id: number) => void
+  onDismissReroute: (id: number) => void
+}) {
+  const [selectedPhcId, setSelectedPhcId] = useState<string>("")
 
-  const options = [
-    {
-      route: "via Suez Canal",
-      days: 22,
-      cost: "₹3,840/TEU",
-      risk: "critical" as Severity,
-      riskScore: 91,
-      note: "HIGH RISK — Active conflict in Red Sea",
-    },
-    {
-      route: "via Cape of Good Hope",
-      days: 36,
-      cost: "₹5,080/TEU",
-      risk: "low" as Severity,
-      riskScore: 18,
-      note: "SAFE — Recommended during current crisis",
-    },
-    {
-      route: "via Cape + Durban bunker",
-      days: 38,
-      cost: "₹4,920/TEU",
-      risk: "low" as Severity,
-      riskScore: 22,
-      note: "SAFE — Optimized bunkering en route",
-    },
-  ]
+  const atRiskPhcs = phcs
+    .filter(p => p.risk === "critical" || p.risk === "high" || p.risk === "medium")
+    .sort((a, b) => b.score - a.score)
 
-  const exportRoutePdf = (opt: typeof options[number]) => {
+  const selectedPhc = phcs.find(p => p.id === selectedPhcId) ?? null
+
+  const suggestionsForSelected = selectedPhc
+    ? reroutes.filter(r => r.toPhc === selectedPhc.name && !r.dismissed)
+    : []
+
+  const exportPlanPdf = () => {
+    if (!selectedPhc) return
     const w = window.open("", "_blank")
     if (!w) return
+    const rows = suggestionsForSelected
+      .map(
+        r => `<tr>
+          <td>${r.fromPhc}</td>
+          <td>${r.resourceType}</td>
+          <td>${r.quantity}</td>
+          <td>+${r.extraHours}h</td>
+          <td>${r.extraCost}</td>
+          <td>${r.confidence}%</td>
+        </tr>`
+      )
+      .join("")
     w.document.write(`
       <html>
         <head>
-          <title>Route Summary - ${from} to ${to}</title>
+          <title>Redistribution Plan - ${selectedPhc.name}</title>
           <style>
             body { font-family: -apple-system, sans-serif; padding: 40px; color: #111; }
             h1 { font-size: 20px; margin-bottom: 4px; }
             .sub { color: #666; margin-bottom: 24px; font-size: 13px; }
             table { border-collapse: collapse; width: 100%; }
-            td { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-            td:first-child { color: #666; width: 160px; }
-            .note { margin-top: 16px; font-size: 13px; color: #444; }
+            th, td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; text-align: left; }
+            th { color: #666; font-weight: 600; }
           </style>
         </head>
         <body>
-          <h1>PHC-Nexus Route Summary</h1>
-          <div class="sub">${from} &rarr; ${to} &middot; ${cargo}</div>
+          <h1>PHC-Nexus Redistribution Plan</h1>
+          <div class="sub">${selectedPhc.name} · ${selectedPhc.district}, ${selectedPhc.state} · risk ${selectedPhc.score}/100</div>
           <table>
-            <tr><td>Route</td><td>${opt.route}</td></tr>
-            <tr><td>Transit Time</td><td>${opt.days} days</td></tr>
-            <tr><td>Cost</td><td>${opt.cost}</td></tr>
-            <tr><td>ML Risk Score</td><td>${opt.riskScore} / 100 (${opt.risk})</td></tr>
+            <thead><tr><th>From Facility</th><th>Resource</th><th>Qty</th><th>Extra Time</th><th>Extra Cost</th><th>Confidence</th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="6">No suggestions generated yet.</td></tr>`}</tbody>
           </table>
-          <div class="note">${opt.note}</div>
         </body>
       </html>
     `)
@@ -912,55 +722,54 @@ function RoutePlannerPage() {
 
   return (
     <div style={{ padding: 24, overflowY: "auto", height: "100%" }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Route Planner</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Redistribution Planner</h2>
       <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {[
-            { label: "Origin Port", value: from, setter: setFrom, options: ports },
-            { label: "Destination", value: to, setter: setTo, options: destinations },
-            { label: "Cargo Type", value: cargo, setter: setCargo, options: cargoTypes },
-          ].map(({ label, value, setter, options: opts }) => (
-            <div key={label}>
-              <div
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
-                  color: "var(--text-3)",
-                  textTransform: "uppercase",
-                  marginBottom: 6,
-                }}
-              >
-                {label}
-              </div>
-              <select
-                value={value}
-                onChange={e => {
-                  setter(e.target.value)
-                  setPlanned(false)
-                }}
-                style={{
-                  width: "100%",
-                  padding: "8px 10px",
-                  background: "var(--panel)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 4,
-                  color: "var(--text)",
-                  fontSize: 12,
-                  fontFamily: "Outfit, sans-serif",
-                  cursor: "pointer",
-                }}
-              >
-                {opts.map(o => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
+          <div>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                color: "var(--text-3)",
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              Facility in Need
             </div>
-          ))}
+            <select
+              value={selectedPhcId}
+              onChange={e => setSelectedPhcId(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                background: "var(--panel)",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                color: "var(--text)",
+                fontSize: 12,
+                fontFamily: "Outfit, sans-serif",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">Select a PHC/CHC…</option>
+              {atRiskPhcs.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — {p.district} ({p.risk.toUpperCase()}, {p.score})
+                </option>
+              ))}
+            </select>
+            {atRiskPhcs.length === 0 && (
+              <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 6 }}>
+                No facilities currently at medium/high/critical risk.
+              </div>
+            )}
+          </div>
+
           <button
-            onClick={() => { setPlanned(true); setSelectedRoute(null) }}
+            disabled={!selectedPhcId || generatingPhcId === selectedPhcId}
+            onClick={() => selectedPhcId && onGenerateForPhc(selectedPhcId)}
             style={{
               marginTop: 4,
               padding: "10px",
@@ -972,14 +781,34 @@ function RoutePlannerPage() {
               letterSpacing: "0.08em",
               border: "none",
               borderRadius: 4,
-              cursor: "pointer",
+              cursor: !selectedPhcId ? "not-allowed" : "pointer",
+              opacity: !selectedPhcId ? 0.5 : generatingPhcId === selectedPhcId ? 0.6 : 1,
             }}
           >
-            CALCULATE ROUTES
+            {generatingPhcId === selectedPhcId ? "FINDING OPTIONS…" : "FIND REDISTRIBUTION OPTIONS"}
           </button>
+
+          {selectedPhc && (
+            <div
+              style={{
+                background: "var(--panel)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: 12,
+                fontSize: 11,
+                color: "var(--text-2)",
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{selectedPhc.name}</div>
+              <div style={{ color: "var(--text-3)", marginBottom: 6 }}>
+                {selectedPhc.district}, {selectedPhc.state} · {selectedPhc.type} · {selectedPhc.isRemote ? "remote" : "accessible"}
+              </div>
+              <RiskBar score={selectedPhc.score} sev={selectedPhc.risk} />
+            </div>
+          )}
         </div>
 
-        {planned ? (
+        {selectedPhc ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div
               style={{
@@ -988,24 +817,49 @@ function RoutePlannerPage() {
                 fontWeight: 600,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
+                display: "flex",
+                alignItems: "center",
               }}
             >
-              {from} → {to} · {cargo} · 3 options found
+              <span>{suggestionsForSelected.length} option(s) for {selectedPhc.name}</span>
+              {suggestionsForSelected.length > 0 && (
+                <button
+                  onClick={exportPlanPdf}
+                  style={{
+                    marginLeft: "auto",
+                    padding: "4px 10px",
+                    fontSize: 9,
+                    fontFamily: "DM Mono, monospace",
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    background: "transparent",
+                    color: "var(--text-3)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                  }}
+                >
+                  EXPORT PDF
+                </button>
+              )}
             </div>
-            {options.map((opt, i) => (
+
+            {suggestionsForSelected.map(rr => (
               <div
-                key={i}
+                key={rr.id}
                 style={{
                   background: "var(--panel)",
-                  border: `1px solid ${selectedRoute === i ? "#3b82f6" : i === 1 ? "#22c55e40" : "var(--border)"}`,
-                  borderLeft: `2px solid ${SEV_COLOR[opt.risk]}`,
+                  border: `1px solid ${rr.applied ? "#22c55e60" : "var(--border)"}`,
+                  borderLeft: "2px solid #22c55e",
                   borderRadius: 6,
                   padding: 16,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>{opt.route}</span>
-                  {i === 1 && (
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>
+                    {rr.fromPhc} → {rr.toPhc}
+                  </span>
+                  {rr.applied && (
                     <span
                       style={{
                         fontSize: 8,
@@ -1017,33 +871,58 @@ function RoutePlannerPage() {
                         letterSpacing: "0.08em",
                       }}
                     >
-                      RECOMMENDED
+                      APPLIED
                     </span>
                   )}
-                  <span style={{ marginLeft: "auto", fontSize: 9, color: "var(--text-3)" }}>{opt.note}</span>
+                  <span style={{ marginLeft: "auto", fontSize: 9, color: "var(--text-3)" }}>
+                    {rr.resourceType} · {rr.quantity} units
+                  </span>
                 </div>
                 <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
-                  {[["Transit", `${opt.days} days`], ["Cost", opt.cost], ["ML Risk", String(opt.riskScore)]].map(([k, v]) => (
+                  {[
+                    ["Extra Time", `+${rr.extraHours}h`],
+                    ["Extra Cost", rr.extraCost],
+                    ["Confidence", `${rr.confidence}%`],
+                  ].map(([k, v]) => (
                     <div key={k}>
                       <div style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 2 }}>{k}</div>
-                      <div
-                        className="mono"
-                        style={{ fontSize: 14, fontWeight: 500, color: k === "ML Risk" ? SEV_COLOR[opt.risk] : "var(--text)" }}
-                      >
+                      <div className="mono" style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
                         {v}
                       </div>
                     </div>
                   ))}
                 </div>
-                <RiskBar score={opt.riskScore} sev={opt.risk} />
-                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                  <Btn onClick={() => setSelectedRoute(i)}>
-                    {selectedRoute === i ? "\u2713 SELECTED" : "SELECT ROUTE"}
-                  </Btn>
-                  <Btn onClick={() => exportRoutePdf(opt)}>EXPORT PDF</Btn>
+                <div style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5, marginBottom: rr.applied ? 0 : 10 }}>
+                  {rr.reason}
                 </div>
+                {!rr.applied && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn onClick={() => onApplyReroute(rr.id)}>APPLY</Btn>
+                    <Btn danger onClick={() => onDismissReroute(rr.id)}>
+                      DISMISS
+                    </Btn>
+                  </div>
+                )}
               </div>
             ))}
+
+            {suggestionsForSelected.length === 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "var(--panel)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  color: "var(--text-3)",
+                  fontSize: 12,
+                  padding: 40,
+                }}
+              >
+                No suggestions yet — click "Find Redistribution Options" above.
+              </div>
+            )}
           </div>
         ) : (
           <div
@@ -1058,13 +937,14 @@ function RoutePlannerPage() {
               fontSize: 12,
             }}
           >
-            Configure route and click Calculate
+            Select a facility to plan a redistribution
           </div>
         )}
       </div>
     </div>
   )
 }
+
 
 function AlertsPage({ alerts, onDismiss, onNotify }: { alerts: AlertEvent[]; onDismiss: (id: number) => void; onNotify: (id: number) => void }) {
   const [filter, setFilter] = useState<Severity | "all">("all")
@@ -2216,6 +2096,7 @@ export default function App() {
 
   // Reroute generation state
   const [generatingReroutes, setGeneratingReroutes] = useState(false)
+  const [generatingPhcId, setGeneratingPhcId] = useState<string | null>(null)
 
   // Sidebar collapse state
   const [navCollapsed, setNavCollapsed] = useState(false)
@@ -2370,6 +2251,24 @@ export default function App() {
       })
     } finally {
       setGeneratingReroutes(false)
+    }
+  }
+
+  const generateForPhc = async (phcId: string) => {
+    if (generatingPhcId === phcId) return
+    setGeneratingPhcId(phcId)
+    try {
+      const results = await generateRedistributionsApi(phcId)
+      const newReroutes = results.map(rr => adaptRedistribution(rr))
+      setReroutes(prev => {
+        const existingIds = new Set(prev.map(r => r.id))
+        const deduped = newReroutes.filter(r => !existingIds.has(r.id))
+        return [...prev, ...deduped]
+      })
+    } catch (err) {
+      console.error(`Failed to generate redistributions for PHC ${phcId}:`, err)
+    } finally {
+      setGeneratingPhcId(null)
     }
   }
 
@@ -2700,9 +2599,18 @@ export default function App() {
         )}
         {page === "map" && <LiveMapPage phcs={routes} />}
         {page === "stock" && <StockPage stocks={stocks} phcs={routes} />}
-        {page === "planner" && <RoutePlannerPage />}
+        {page === "planner" && (
+          <RoutePlannerPage
+            phcs={routes}
+            reroutes={reroutes}
+            onGenerateForPhc={generateForPhc}
+            generatingPhcId={generatingPhcId}
+            onApplyReroute={applyReroute}
+            onDismissReroute={dismissReroute}
+          />
+        )}
         {page === "alerts" && <AlertsPage alerts={alerts} onDismiss={dismissAlert} onNotify={notifyTeam} />}
-        {page === "analytics" && <AnalyticsPage />}
+        {page === "analytics" && <AnalyticsPage alerts={alerts} stocks={stocks} phcs={routes} reroutes={reroutes} />}
         {page === "settings" && <SettingsPage />}
       </div>
     </div>
