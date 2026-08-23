@@ -16,6 +16,7 @@ import type { ResourceStockView } from "./services/project44"
 
 type Severity = "critical" | "high" | "medium" | "low"
 type NavPage = "dashboard" | "map" | "stock" | "planner" | "alerts" | "analytics" | "settings"
+type DataSourceEntry = { name: string; status: string; detail: string }
 
 type AlertEvent = {
   id: number
@@ -496,33 +497,33 @@ function AnalyticsPage() {
 
   const barData = [
     { label: "Conflict", count: 18, sev: "critical" as Severity },
-    { label: "Hub Strike", count: 7, sev: "high" as Severity },
+    { label: "Port Strike", count: 7, sev: "high" as Severity },
     { label: "Weather", count: 24, sev: "medium" as Severity },
-    { label: "Policy Change", count: 11, sev: "high" as Severity },
-    { label: "Chokepoint", count: 5, sev: "medium" as Severity },
+    { label: "Sanctions", count: 11, sev: "high" as Severity },
+    { label: "Canal", count: 5, sev: "medium" as Severity },
     { label: "Tariff", count: 9, sev: "low" as Severity },
   ]
   const maxBar = Math.max(...barData.map(d => d.count))
 
-  // Demand history (units/month, essential medicines): Dec → Aug
-  const demandHistory = [500, 680, 900, 1500, 2800, 4000, 3800]
+  // Freight rate history (USD/TEU): Dec → Aug
+  const freightHistory = [500, 680, 900, 1500, 2800, 4000, 3800]
   const allMonthLabels = ["Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"]
-  const xs = demandHistory.map((_, i) => i)
-  const reg = linearRegression(xs, demandHistory)
+  const xs = freightHistory.map((_, i) => i)
+  const reg = linearRegression(xs, freightHistory)
   const forecasted = [7, 8, 9].map(x => Math.max(200, Math.round(reg.slope * x + reg.intercept)))
 
-  const zScores = zScoreAnomalies(demandHistory)
+  const zScores = zScoreAnomalies(freightHistory)
   const anomalyThreshold = 1.5
 
   // SVG coordinate helpers
-  const allVals = [...demandHistory, ...forecasted]
+  const allVals = [...freightHistory, ...forecasted]
   const minVal = Math.min(...allVals)
   const maxVal = Math.max(...allVals)
   const toY = (v: number) => 10 + (1 - (v - minVal) / (maxVal - minVal || 1)) * 72
 
   const xStep = 30
-  const histPoints = demandHistory.map((v, i) => ({ x: i * xStep, y: toY(v) }))
-  const forecastPoints = forecasted.map((v, i) => ({ x: (demandHistory.length + i) * xStep, y: toY(v) }))
+  const histPoints = freightHistory.map((v, i) => ({ x: i * xStep, y: toY(v) }))
+  const forecastPoints = forecasted.map((v, i) => ({ x: (freightHistory.length + i) * xStep, y: toY(v) }))
   const svgW = (allMonthLabels.length - 1) * xStep + 24
 
   const histPath = histPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ")
@@ -531,11 +532,11 @@ function AnalyticsPage() {
     .join(" ")
 
   const corridors = [
-    { name: "Mumbai CWH → Nashik Cluster", disruptions: 14, avgDelay: "16d", demandDelta: "+680%", trend: "up" },
-    { name: "Kolkata CWH → Siliguri Cluster", disruptions: 11, avgDelay: "21d", demandDelta: "+580%", trend: "up" },
-    { name: "Chennai CWH → Madurai Cluster", disruptions: 6, avgDelay: "4d", demandDelta: "+95%", trend: "stable" },
-    { name: "Ahmedabad CWH → Bhuj Cluster", disruptions: 4, avgDelay: "2d", demandDelta: "+42%", trend: "stable" },
-    { name: "Cochin CWH → Idukki Cluster", disruptions: 1, avgDelay: "—", demandDelta: "+12%", trend: "down" },
+    { name: "JNPT → Rotterdam", disruptions: 14, avgDelay: "16d", freightDelta: "+680%", trend: "up" },
+    { name: "Kolkata → Hamburg", disruptions: 11, avgDelay: "21d", freightDelta: "+580%", trend: "up" },
+    { name: "Chennai → Singapore", disruptions: 6, avgDelay: "4d", freightDelta: "+95%", trend: "stable" },
+    { name: "Mundra → Shanghai", disruptions: 4, avgDelay: "2d", freightDelta: "+42%", trend: "stable" },
+    { name: "Cochin → Jeddah", disruptions: 1, avgDelay: "—", freightDelta: "+12%", trend: "down" },
   ]
 
   return (
@@ -577,7 +578,7 @@ function AnalyticsPage() {
               marginBottom: 14,
             }}
           >
-            Demand Disruption Drivers · {period}
+            Disruptions by Type · {period}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 120 }}>
             {barData.map(d => (
@@ -613,7 +614,7 @@ function AnalyticsPage() {
                 textTransform: "uppercase",
               }}
             >
-              Demand Forecast · PHC Network (Zone A)
+              Freight Rate · Kolkata–Rotterdam
             </div>
             <span
               className="mono"
@@ -632,10 +633,10 @@ function AnalyticsPage() {
           <div style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 8 }}>
             Forecast Sep–Nov:{" "}
             <span className="mono" style={{ color: "var(--primary)" }}>
-              {forecasted[0].toLocaleString()}→{forecasted[2].toLocaleString()} units/mo
+              ${forecasted[0].toLocaleString()}→${forecasted[2].toLocaleString()}/TEU
             </span>
             <span style={{ marginLeft: 6, color: reg.slope < 0 ? "#22c55e" : "#f59e0b" }}>
-              {reg.slope < 0 ? "↓ declining" : "↑ rising"}
+              {reg.slope < 0 ? "↓ easing" : "↑ rising"}
             </span>
           </div>
           <svg viewBox={`0 0 ${svgW} 108`} style={{ width: "100%", height: 108 }}>
@@ -700,14 +701,14 @@ function AnalyticsPage() {
               <g key={`f${i}`}>
                 <circle cx={p.x} cy={p.y} r="2.5" fill="#00d4ff" opacity="0.75" />
                 <text x={p.x} y="101" fill="#4d6480" fontSize="6.5" textAnchor="middle" fontFamily="DM Mono, monospace">
-                  {allMonthLabels[demandHistory.length + i]}
+                  {allMonthLabels[freightHistory.length + i]}
                 </text>
               </g>
             ))}
 
             {/* Y-axis */}
-            <text x="2" y="87" fill="#4d6480" fontSize="6.5" fontFamily="DM Mono, monospace">{minVal}</text>
-            <text x="2" y="17" fill="#4d6480" fontSize="6.5" fontFamily="DM Mono, monospace">{(maxVal / 1000).toFixed(1)}k</text>
+            <text x="2" y="87" fill="#4d6480" fontSize="6.5" fontFamily="DM Mono, monospace">${minVal}</text>
+            <text x="2" y="17" fill="#4d6480" fontSize="6.5" fontFamily="DM Mono, monospace">${(maxVal / 1000).toFixed(1)}k</text>
 
             {/* Anomaly legend dot */}
             <circle cx={svgW - 46} cy="20" r="3.5" fill="#f59e0b" opacity="0.9" />
@@ -740,9 +741,9 @@ function AnalyticsPage() {
             whiteSpace: "nowrap",
           }}
         >
-          Z-Score Anomaly · Demand
+          Z-Score Anomaly · Freight
         </span>
-        {demandHistory.map((_, i) => {
+        {freightHistory.map((_, i) => {
           const z = zScores[i]
           const isA = z > anomalyThreshold
           return (
@@ -772,12 +773,12 @@ function AnalyticsPage() {
             textTransform: "uppercase",
           }}
         >
-          Supply Route Performance
+          Corridor Performance
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>
-              {["Route", "Disruptions", "Avg Delay", "Demand Δ", "Trend"].map(h => (
+              {["Corridor", "Disruptions", "Avg Delay", "Freight Δ", "Trend"].map(h => (
                 <th
                   key={h}
                   style={{
@@ -815,7 +816,7 @@ function AnalyticsPage() {
                   {c.avgDelay}
                 </td>
                 <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: "#ef4444" }}>
-                  {c.demandDelta}
+                  {c.freightDelta}
                 </td>
                 <td style={{ padding: "8px 16px" }}>
                   <span
@@ -837,40 +838,40 @@ function AnalyticsPage() {
 }
 
 function RoutePlannerPage() {
-  const [from, setFrom] = useState("Mumbai CWH")
-  const [to, setTo] = useState("Nashik Cluster")
-  const [cargo, setCargo] = useState("Essential Medicines")
+  const [from, setFrom] = useState("JNPT")
+  const [to, setTo] = useState("Rotterdam")
+  const [cargo, setCargo] = useState("General Cargo")
   const [planned, setPlanned] = useState(false)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
 
-  const ports = ["Mumbai CWH", "Ahmedabad CWH", "Chennai CWH", "Kolkata CWH", "Cochin CWH"]
-  const destinations = ["Nashik Cluster", "Siliguri Cluster", "Madurai Cluster", "Bhuj Cluster", "Idukki Cluster", "Ranchi Cluster"]
-  const cargoTypes = ["Essential Medicines", "Vaccines", "PPE Kits", "Surgical Supplies", "Diagnostic Kits", "Cold Chain Items"]
+  const ports = ["JNPT", "Mundra", "Chennai", "Kolkata", "Cochin"]
+  const destinations = ["Rotterdam", "Hamburg", "Shanghai", "Singapore", "Los Angeles", "Jeddah"]
+  const cargoTypes = ["General Cargo", "Basmati Rice", "Petroleum", "Textiles", "Chemicals", "Machinery"]
 
   const options = [
     {
-      route: "via NH48 Highway",
+      route: "via Suez Canal",
       days: 22,
-      cost: "₹3,840/unit",
+      cost: "₹3,840/TEU",
       risk: "critical" as Severity,
       riskScore: 91,
-      note: "HIGH RISK — Active flooding on route",
+      note: "HIGH RISK — Active conflict in Red Sea",
     },
     {
-      route: "via Rail Freight Corridor",
+      route: "via Cape of Good Hope",
       days: 36,
-      cost: "₹5,080/unit",
+      cost: "₹5,080/TEU",
       risk: "low" as Severity,
       riskScore: 18,
-      note: "SAFE — Recommended during monsoon disruption",
+      note: "SAFE — Recommended during current crisis",
     },
     {
-      route: "via State Highway + Cold Chain",
+      route: "via Cape + Durban bunker",
       days: 38,
-      cost: "₹4,920/unit",
+      cost: "₹4,920/TEU",
       risk: "low" as Severity,
       riskScore: 22,
-      note: "SAFE — Optimized cold-chain stops en route",
+      note: "SAFE — Optimized bunkering en route",
     },
   ]
 
@@ -880,7 +881,7 @@ function RoutePlannerPage() {
     w.document.write(`
       <html>
         <head>
-          <title>Distribution Summary - ${from} to ${to}</title>
+          <title>Route Summary - ${from} to ${to}</title>
           <style>
             body { font-family: -apple-system, sans-serif; padding: 40px; color: #111; }
             h1 { font-size: 20px; margin-bottom: 4px; }
@@ -892,7 +893,7 @@ function RoutePlannerPage() {
           </style>
         </head>
         <body>
-          <h1>PHC-Nexus Distribution Summary</h1>
+          <h1>PHC-Nexus Route Summary</h1>
           <div class="sub">${from} &rarr; ${to} &middot; ${cargo}</div>
           <table>
             <tr><td>Route</td><td>${opt.route}</td></tr>
@@ -911,13 +912,13 @@ function RoutePlannerPage() {
 
   return (
     <div style={{ padding: 24, overflowY: "auto", height: "100%" }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Distribution Planner</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Route Planner</h2>
       <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
-            { label: "Origin Warehouse", value: from, setter: setFrom, options: ports },
-            { label: "Destination Cluster", value: to, setter: setTo, options: destinations },
-            { label: "Supply Type", value: cargo, setter: setCargo, options: cargoTypes },
+            { label: "Origin Port", value: from, setter: setFrom, options: ports },
+            { label: "Destination", value: to, setter: setTo, options: destinations },
+            { label: "Cargo Type", value: cargo, setter: setCargo, options: cargoTypes },
           ].map(({ label, value, setter, options: opts }) => (
             <div key={label}>
               <div
@@ -1291,19 +1292,140 @@ function StockPage({ stocks, phcs }: { stocks: ResourceStockView[]; phcs: PHCEnt
   )
 }
 
+
 function SettingsPage() {
   const [notif, setNotif] = useState({ email: true, whatsapp: false, sms: true })
   const [thresh, setThresh] = useState<Severity>("high")
+  const [contact, setContact] = useState({ name: "", email: "", phone: "" })
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [sources, setSources] = useState<DataSourceEntry[]>([])
 
-  function save() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [settingsRes, statusRes] = await Promise.all([
+          fetch(`${BACKEND_URL}/settings`),
+          fetch(`${BACKEND_URL}/settings/system-status`),
+        ])
+        const settingsData = await settingsRes.json()
+        const statusData = await statusRes.json()
+        if (cancelled) return
+
+        setNotif({
+          email: settingsData.notif_email,
+          whatsapp: settingsData.notif_whatsapp,
+          sms: settingsData.notif_sms,
+        })
+        setThresh(settingsData.alert_threshold as Severity)
+        setContact({
+          name: settingsData.contact_name || "",
+          email: settingsData.contact_email || "",
+          phone: settingsData.contact_phone || "",
+        })
+        setSources(statusData.sources || [])
+      } catch (e) {
+        console.error("Failed to load settings", e)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function save() {
+    try {
+      await fetch(`${BACKEND_URL}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notif_email: notif.email,
+          notif_whatsapp: notif.whatsapp,
+          notif_sms: notif.sms,
+          alert_threshold: thresh,
+          contact_name: contact.name,
+          contact_email: contact.email,
+          contact_phone: contact.phone,
+        }),
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      console.error("Failed to save settings", e)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: 24, fontSize: 12, color: "var(--text-3)" }}>Loading settings…</div>
+    )
   }
 
   return (
     <div style={{ padding: 24, maxWidth: 560, overflowY: "auto", height: "100%" }}>
       <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 24 }}>Settings</h2>
+
+      <section style={{ marginBottom: 28 }}>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            color: "var(--text-3)",
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}
+        >
+          Contact Info
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          <input
+            value={contact.name}
+            onChange={e => setContact(c => ({ ...c, name: e.target.value }))}
+            placeholder="Your name"
+            style={{
+              padding: "8px 10px",
+              fontSize: 11,
+              borderRadius: 4,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text-1)",
+            }}
+          />
+          <input
+            value={contact.email}
+            onChange={e => setContact(c => ({ ...c, email: e.target.value }))}
+            placeholder="Email address"
+            style={{
+              padding: "8px 10px",
+              fontSize: 11,
+              borderRadius: 4,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text-1)",
+            }}
+          />
+          <input
+            value={contact.phone}
+            onChange={e => setContact(c => ({ ...c, phone: e.target.value }))}
+            placeholder="Phone number"
+            style={{
+              padding: "8px 10px",
+              fontSize: 11,
+              borderRadius: 4,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--text-1)",
+            }}
+          />
+        </div>
+      </section>
 
       <section style={{ marginBottom: 28 }}>
         <div
@@ -1333,7 +1455,9 @@ function SettingsPage() {
               <div style={{ fontSize: 12, fontWeight: 500, textTransform: "capitalize", marginBottom: 2 }}>
                 {ch === "sms" ? "SMS" : ch.charAt(0).toUpperCase() + ch.slice(1)}
               </div>
-              <div style={{ fontSize: 10, color: "var(--text-3)" }}>{ch === "email" ? "aparnadhiraj07@gmail.com" : "+91 73566 75700"}</div>
+              <div style={{ fontSize: 10, color: "var(--text-3)" }}>
+                {ch === "email" ? (contact.email || "No email set") : (contact.phone || "No phone set")}
+              </div>
             </div>
             <div
               onClick={() => setNotif(n => ({ ...n, [ch]: !n[ch] }))}
@@ -1419,13 +1543,7 @@ function SettingsPage() {
         >
           Data Sources
         </div>
-        {[
-          ["Gemini AI (Redistribution Reasoning)", "Active", "Connected"],
-          ["scikit-learn Risk Model", "Active", "Connected"],
-          ["PHC Stock Reporting (HMIS)", "Partial", "4/6 states"],
-          ["Fast2SMS Notifications", "Active", "Connected"],
-          ["State Health Dept Feeds", "Partial", "2/6 states"],
-        ].map(([name, status, detail]) => (
+        {sources.map(({ name, status, detail }) => (
           <div
             key={name}
             style={{
@@ -1480,6 +1598,7 @@ function SettingsPage() {
     </div>
   )
 }
+
 
 // ─── Dashboard View ───────────────────────────────────────────────────────────
 
@@ -2260,7 +2379,7 @@ export default function App() {
   const navItems: { icon: string; label: string; id: NavPage; badge?: number }[] = [
     { icon: "◈", label: "Dashboard", id: "dashboard" },
     { icon: "⬡", label: "Live Map", id: "map" },
-    { icon: "◇", label: "Distribution Planner", id: "planner" },
+    { icon: "◇", label: "Route Planner", id: "planner" },
     { icon: "△", label: "Alerts", id: "alerts", badge: criticalCount },
     { icon: "□", label: "Analytics", id: "analytics" },
     { icon: "○", label: "Settings", id: "settings" },
@@ -2296,7 +2415,7 @@ export default function App() {
             <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "DM Mono, monospace" }}>P</span>
           </div>
           <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>PHC-Nexus</span>
-          <span style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.1em", fontWeight: 600 }}>PUBLIC HEALTH SUPPLY INTELLIGENCE</span>
+          <span style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.1em", fontWeight: 600 }}>SUPPLY CHAIN INTELLIGENCE</span>
         </div>
 
         <div style={{ width: 1, height: 20, background: "var(--border)" }} />

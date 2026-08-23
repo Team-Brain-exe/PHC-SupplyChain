@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.models import phc, resource_stock, health_alert, redistribution, user_device, notification  # noqa: F401
-from app.routers import ml, health_alerts, phcs, resource_stocks, redistributions, user_devices, notifications, ai
+from app.models import phc, resource_stock, health_alert, redistribution, user_device, notification, app_settings  # noqa: F401
+from app.routers import ml, health_alerts, phcs, resource_stocks, redistributions, user_devices, notifications, ai, app_settings as app_settings_router
 from app.services.live_simulator import start_simulator, stop_simulator
 
 app = FastAPI(title="PHC-Nexus API")
@@ -42,3 +42,4 @@ app.include_router(redistributions.router)
 app.include_router(user_devices.router)
 app.include_router(notifications.router)
 app.include_router(ai.router)
+app.include_router(app_settings_router.router)
