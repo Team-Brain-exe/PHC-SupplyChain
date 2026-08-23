@@ -1527,7 +1527,7 @@ function DashboardView({
   const statesCovered = new Set(routes.map(r => r.state)).size
   const criticalPhcs = routes.filter(r => r.risk === "critical").length
   const avgRiskScore = routes.length ? Math.round(routes.reduce((sum, r) => sum + r.score, 0) / routes.length) : 0
-  const dashboardStats = [
+  const dashboardStats: { label: string; value: string; delta: string | null; sub: string }[] = [
     { label: "PHCs Monitored", value: String(routes.length), delta: null, sub: "in network" },
     { label: "States Covered", value: String(statesCovered), delta: null, sub: "across India" },
     { label: "Active Stock-Outs", value: String(criticalPhcs), delta: null, sub: "critical risk" },
@@ -2278,7 +2278,7 @@ export default function App() {
   const navItems: { icon: string; label: string; id: NavPage; badge?: number }[] = [
     { icon: "◈", label: "Dashboard", id: "dashboard" },
     { icon: "⬡", label: "Live Map", id: "map" },
-    { icon: "◇", label: "Route Planner", id: "planner" },
+    { icon: "◇", label: "Redistribution Planner", id: "planner" },
     { icon: "△", label: "Alerts", id: "alerts", badge: criticalCount },
     { icon: "□", label: "Analytics", id: "analytics" },
     { icon: "○", label: "Settings", id: "settings" },
