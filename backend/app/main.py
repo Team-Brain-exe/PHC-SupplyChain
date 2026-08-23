@@ -2,10 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.models import alert, route, reroute, port, user_device, notification  # noqa: F401
-from app.routers import ml, alerts, routes, reroutes, ports, user_devices, notifications, ai, aircraft
+from app.models import phc, resource_stock, health_alert, redistribution, user_device, notification  # noqa: F401
+from app.routers import ml, health_alerts, phcs, resource_stocks, redistributions, user_devices, notifications, ai
 
-app = FastAPI(title="Project44 API")
+app = FastAPI(title="PHC-Nexus API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,11 +24,10 @@ def health_check():
 
 
 app.include_router(ml.router)
-app.include_router(alerts.router)
-app.include_router(routes.router)
-app.include_router(reroutes.router)
-app.include_router(ports.router)
+app.include_router(health_alerts.router)
+app.include_router(phcs.router)
+app.include_router(resource_stocks.router)
+app.include_router(redistributions.router)
 app.include_router(user_devices.router)
 app.include_router(notifications.router)
 app.include_router(ai.router)
-app.include_router(aircraft.router)

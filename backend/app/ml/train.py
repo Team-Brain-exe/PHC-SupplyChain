@@ -16,7 +16,7 @@ except ImportError:
     from features import FEATURE_NAMES
 
 THIS_DIR = pathlib.Path(__file__).parent
-DATA_PATH = THIS_DIR / "../../data/raw/shipping_risk.csv"
+DATA_PATH = THIS_DIR / "../../data/raw/phc_stockout_risk.csv"
 MODEL_OUT_PATH = THIS_DIR / "artifacts/model.pkl"
 
 
