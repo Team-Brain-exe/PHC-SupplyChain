@@ -71,7 +71,7 @@ def update_settings(update: AppSettingsUpdate, db: Session = Depends(get_db)):
 @router.get("/system-status")
 def get_system_status(db: Session = Depends(get_db)):
     """
-    Reports genuine integration status — no fabricated 'X/6 states' strings.
+    Reports genuine integration status -- no fabricated 'X/6 states' strings.
     Each entry reflects something actually checkable in this codebase.
     """
     model_path = pathlib.Path(__file__).parent.parent / "ml" / "artifacts" / "model.pkl"
@@ -106,8 +106,12 @@ def get_system_status(db: Session = Depends(get_db)):
             },
             {
                 "name": "Fast2SMS Notifications",
-                "status": "Active" if app_config.fast2sms_api_key else "Not configured",
-                "detail": "API key set" if app_config.fast2sms_api_key else "No API key",
+                "status": "Demo Mode" if app_config.demo_sms_mode else ("Active" if app_config.fast2sms_api_key else "Not configured"),
+                "detail": (
+                    "Simulated sends -- no real SMS (DEMO_SMS_MODE=true)"
+                    if app_config.demo_sms_mode
+                    else ("API key set" if app_config.fast2sms_api_key else "No API key")
+                ),
             },
             {
                 "name": "Live Telemetry Simulator",
