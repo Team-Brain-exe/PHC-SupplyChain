@@ -1,24 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
 :root {
-  --bg: #070a11;
-  --panel: #0c1120;
-  --panel-2: #111826;
-  --border: #1e2d45;
-  --border-light: #243447;
-  --primary: #00d4ff;
-  --primary-dim: rgba(0, 212, 255, 0.12);
-  --amber: #f59e0b;
-  --amber-dim: rgba(245, 158, 11, 0.12);
-  --red: #ef4444;
-  --red-dim: rgba(239, 68, 68, 0.12);
-  --green: #22c55e;
-  --green-dim: rgba(34, 197, 94, 0.1);
-  --text: #e2eaf4;
-  --text-2: #8ba0bc;
-  --text-3: #4d6480;
-  --font-ui: 'Outfit', system-ui, sans-serif;
+  /* Palantir × Bloomberg-terminal-but-cleaner. Deep charcoal/navy,
+     warm off-white text, one muted teal/emerald accent, restrained
+     warning/critical colors, glass surfaces. */
+  --bg: #080b12;
+  --panel: #0f141d;
+  --panel-2: #141a25;
+  --border: #1c2530;
+  --border-light: #242e3b;
+
+  --primary: #36c7a5;
+  --primary-dim: rgba(54, 199, 165, 0.12);
+  --primary-end: #1f8f76; /* gradient end for brand mark etc. */
+
+  --warning: #f5b942;
+  --warning-dim: rgba(245, 185, 66, 0.12);
+  --critical: #ef5b68;
+  --critical-dim: rgba(239, 91, 104, 0.12);
+  --medium: #e8935a;
+  --medium-dim: rgba(232, 147, 90, 0.12);
+  --success: #4fd9b0;
+  --success-dim: rgba(79, 217, 176, 0.12);
+
+  /* legacy aliases so existing var(--amber)/var(--red)/var(--green) calls
+     keep working without touching every call site */
+  --amber: var(--warning);
+  --amber-dim: var(--warning-dim);
+  --red: var(--critical);
+  --red-dim: var(--critical-dim);
+  --green: var(--success);
+  --green-dim: var(--success-dim);
+
+  --text: #f4f7fa;
+  --text-1: var(--text);
+  --text-2: #8993a4;
+  --text-3: #5b6474;
+
+  --glass: rgba(15, 20, 29, 0.72);
+  --glass-border: rgba(244, 247, 250, 0.08);
+
+  --font-ui: 'Inter', system-ui, sans-serif;
   --font-data: 'DM Mono', monospace;
 }
 
@@ -29,16 +52,38 @@ html, body, #root {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.45;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reserve monospace for data values only: timestamps, IDs, scores, counters.
+   Labels and body copy stay on the sans-serif UI font. */
+.mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+/* Reusable glass-surface card, used for floating map overlays and panels */
+.glass-card {
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Free OpenStreetMap raster tiles come light-mode only (no free dark
+   tile server without an API key) — this re-tints them to match the
+   app's dark theme, same trick used for the shipping-risk dashboard's
+   map. */
+.map-tiles-dark {
+  filter: invert(92%) hue-rotate(180deg) brightness(0.9) contrast(1.05) saturate(0.5);
 }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
-
-.mono { font-family: var(--font-data); }
 
 @keyframes pulse-ring {
   0% { transform: scale(0.8); opacity: 0.8; }

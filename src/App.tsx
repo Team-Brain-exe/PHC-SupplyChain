@@ -70,16 +70,16 @@ type MLScore = {
 
 
 const SEV_COLOR: Record<Severity, string> = {
-  critical: "#ef4444",
-  high: "#f59e0b",
-  medium: "#f97316",
-  low: "#22c55e",
+  critical: "#ef5b68",
+  high: "#f5b942",
+  medium: "#e8935a",
+  low: "#4fd9b0",
 }
 const SEV_BG: Record<Severity, string> = {
-  critical: "rgba(239,68,68,0.10)",
-  high: "rgba(245,158,11,0.10)",
-  medium: "rgba(249,115,22,0.10)",
-  low: "rgba(34,197,94,0.08)",
+  critical: "rgba(239,91,104,0.10)",
+  high: "rgba(245,185,66,0.10)",
+  medium: "rgba(232,147,90,0.10)",
+  low: "rgba(79,217,176,0.08)",
 }
 
 function fmtAge(min: number) {
@@ -178,8 +178,8 @@ async function callRiskAnalysis(payload: {
 function LiveDot() {
   return (
     <span style={{ position: "relative", display: "inline-flex", alignItems: "center", width: 10, height: 10 }}>
-      <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#22c55e", animation: "pulse-ring 1.8s ease-out infinite" }} />
-      <span style={{ position: "relative", width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "block" }} />
+      <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#4fd9b0", animation: "pulse-ring 1.8s ease-out infinite" }} />
+      <span style={{ position: "relative", width: 7, height: 7, borderRadius: "50%", background: "#4fd9b0", display: "block" }} />
     </span>
   )
 }
@@ -208,7 +208,7 @@ function SeverityBadge({ sev }: { sev: Severity }) {
 function RiskBar({ score, sev }: { score: number; sev: Severity }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ flex: 1, height: 3, background: "#1a2d42", borderRadius: 2, overflow: "hidden" }}>
+      <div style={{ flex: 1, height: 3, background: "#1c2530", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ width: `${score}%`, height: "100%", background: SEV_COLOR[sev], borderRadius: 2, transition: "width 0.4s ease" }} />
       </div>
       <span className="mono" style={{ fontSize: 10, color: SEV_COLOR[sev], minWidth: 24, textAlign: "right" }}>
@@ -220,12 +220,12 @@ function RiskBar({ score, sev }: { score: number; sev: Severity }) {
 
 function ShimmerBar() {
   return (
-    <div style={{ height: 3, borderRadius: 2, overflow: "hidden", background: "#1a2d42" }}>
+    <div style={{ height: 3, borderRadius: 2, overflow: "hidden", background: "#1c2530" }}>
       <div
         style={{
           width: "55%",
           height: "100%",
-          background: "linear-gradient(90deg, #1a2d42 0%, #243447 50%, #1a2d42 100%)",
+          background: "linear-gradient(90deg, #1c2530 0%, #242e3b 50%, #1c2530 100%)",
           backgroundSize: "200% 100%",
           animation: "shimmer 1.4s ease infinite",
           borderRadius: 2,
@@ -247,23 +247,22 @@ function Btn({
   danger?: boolean
 }) {
   const [hover, setHover] = useState(false)
-  const bg = danger ? (hover ? "#ef4444" : "rgba(239,68,68,0.12)") : hover ? "var(--primary)" : "var(--primary-dim)"
-  const col = danger ? (hover ? "#fff" : "#ef4444") : hover ? "#000" : "var(--primary)"
+  const bg = danger ? (hover ? "#ef5b68" : "rgba(239,91,104,0.12)") : hover ? "var(--primary)" : "var(--primary-dim)"
+  const col = danger ? (hover ? "#fff" : "#ef5b68") : hover ? "#000" : "var(--primary)"
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        padding: small ? "3px 8px" : "5px 12px",
-        fontSize: small ? 9 : 10,
-        fontFamily: "DM Mono, monospace",
+        padding: small ? "4px 10px" : "6px 14px",
+        fontSize: small ? 11 : 12,
+        fontFamily: "var(--font-ui)",
         fontWeight: 600,
-        letterSpacing: "0.06em",
         background: bg,
         color: col,
-        border: `1px solid ${danger ? "#ef444440" : "var(--primary)40"}`,
-        borderRadius: 4,
+        border: `1px solid ${danger ? "rgba(239,91,104,0.3)" : "rgba(54,199,165,0.3)"}`,
+        borderRadius: 6,
         cursor: "pointer",
         transition: "all 0.15s",
         whiteSpace: "nowrap",
@@ -289,7 +288,7 @@ function FeatureChart({ features }: { features: MLScore["features"] }) {
           <span className="mono" style={{ fontSize: 7, color: "var(--text-3)", width: 42, textAlign: "right" }}>
             {item.label}
           </span>
-          <div style={{ flex: 1, height: 2, background: "#1a2d42", borderRadius: 1, overflow: "hidden" }}>
+          <div style={{ flex: 1, height: 2, background: "#1c2530", borderRadius: 1, overflow: "hidden" }}>
             <div
               style={{
                 width: `${item.val * 100}%`,
@@ -309,187 +308,6 @@ function FeatureChart({ features }: { features: MLScore["features"] }) {
     </div>
   )
 }
-
-// ─── World Map SVG ─────────────────────────────────────────────────────────────
-
-function WorldMap({
-  activeAlert,
-  mlScores,
-  fullscreen,
-}: {
-  activeAlert: number | null
-  mlScores?: Record<number, MLScore>
-  fullscreen?: boolean
-}) {
-  const hotspots = [
-    { id: 1, cx: 310, cy: 178, label: "Red Sea / Bab-el-Mandeb", sev: "critical" as Severity },
-    { id: 4, cx: 318, cy: 160, label: "Suez Canal", sev: "high" as Severity },
-    { id: 2, cx: 530, cy: 230, label: "Malacca Strait", sev: "medium" as Severity },
-    { id: 3, cx: 470, cy: 230, label: "Colombo", sev: "high" as Severity },
-    { id: 5, cx: 168, cy: 218, label: "Panama Canal", sev: "medium" as Severity },
-    { id: 6, cx: 258, cy: 310, label: "Cape of Good Hope", sev: "low" as Severity },
-  ]
-  const ports = [
-    { cx: 448, cy: 192, label: "JNPT" },
-    { cx: 452, cy: 196, label: "MND" },
-    { cx: 463, cy: 211, label: "CHN" },
-    { cx: 440, cy: 206, label: "COK" },
-    { cx: 478, cy: 180, label: "KOL" },
-  ]
-
-  return (
-    <svg
-      viewBox="0 0 800 400"
-      preserveAspectRatio="none"
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "block",
-      }}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <radialGradient id="h-critical" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#ef4444" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="h-high" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="h-medium" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="h-low" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#22c55e" stopOpacity="0.15" />
-          <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      <rect width="800" height="400" fill="#07111e" />
-
-      {/* Continents */}
-      <path d="M240,60 L320,55 L340,80 L330,110 L310,120 L280,115 L250,100 L230,80 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-      <path d="M260,115 L310,120 L340,140 L355,180 L350,240 L330,290 L295,310 L265,295 L245,260 L240,210 L248,160 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-      <path d="M340,60 L500,50 L560,70 L590,100 L570,140 L530,160 L500,170 L460,160 L420,155 L390,140 L350,120 L330,110 L340,80 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-      <path d="M420,155 L460,160 L480,175 L475,215 L455,235 L435,220 L425,195 L418,170 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-      <path d="M530,160 L570,155 L590,170 L580,195 L550,205 L530,195 L520,180 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-      <path d="M60,70 L170,65 L190,100 L185,160 L170,220 L150,270 L140,320 L120,320 L100,280 L85,220 L70,160 L55,110 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-      <path d="M590,240 L660,235 L680,265 L670,300 L640,315 L605,305 L585,278 Z" fill="#0e1e30" stroke="#1a2e48" strokeWidth="0.5" />
-
-      {/* Trade routes */}
-      <path
-        d="M448,192 Q420,200 380,188 Q350,178 318,165 Q300,155 290,148 Q272,130 265,120 Q258,110 250,100 Q244,90 240,85 Q255,82 270,80"
-        fill="none"
-        stroke={activeAlert === 1 || activeAlert === 4 ? "#ef4444" : "#00d4ff"}
-        strokeWidth={activeAlert === 1 || activeAlert === 4 ? "3" : "2"}
-        strokeDasharray={activeAlert === 1 || activeAlert === 4 ? "0" : "4,3"}
-        opacity="0.7"
-      />
-      <path
-        d="M448,192 Q445,220 442,240 Q438,270 400,295 Q360,310 310,305 Q275,302 258,306 Q250,295 245,270 Q240,240 240,200"
-        fill="none"
-        stroke="#22c55e"
-        strokeWidth="1"
-        strokeDasharray="5,4"
-        opacity="0.35"
-      />
-      <path
-        d="M452,194 Q490,185 520,175 Q550,168 570,190 Q590,210 610,210 Q650,208 700,200"
-        fill="none"
-        stroke={activeAlert === 3 ? "#f97316" : "#00d4ff"}
-        strokeWidth="2"
-        strokeDasharray="6,4"
-        opacity={activeAlert === 3 ? "0.9" : "0.5"}
-      />
-      <path
-        d="M463,211 Q462,225 465,230 Q470,230 475,225 Q490,218 520,225 Q535,228 545,226"
-        fill="none"
-        stroke={activeAlert === 2 ? "#f59e0b" : "#00d4ff"}
-        strokeWidth="1.2"
-        strokeDasharray="4,3"
-        opacity="0.55"
-      />
-
-      {/* Hotspots with ML score badges */}
-      {hotspots.map(h => {
-        const ml = mlScores?.[h.id]
-        return (
-          <g key={h.id}>
-            <circle cx={h.cx} cy={h.cy} r="28" fill={`url(#h-${h.sev})`} />
-            <circle
-              cx={h.cx}
-              cy={h.cy}
-              r="7"
-              fill={SEV_COLOR[h.sev]}
-              fillOpacity="0.18"
-              stroke={SEV_COLOR[h.sev]}
-              strokeWidth="1.2"
-              strokeOpacity={activeAlert === h.id ? "1" : "0.65"}
-            />
-            <circle cx={h.cx} cy={h.cy} r="3.5" fill={SEV_COLOR[h.sev]} opacity={activeAlert === h.id ? "1" : "0.8"} />
-            {activeAlert === h.id && (
-              <circle cx={h.cx} cy={h.cy} r="12" fill="none" stroke={SEV_COLOR[h.sev]} strokeWidth="1" opacity="0.6">
-                <animate attributeName="r" values="7;18;7" dur="1.8s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.6;0;0.6" dur="1.8s" repeatCount="indefinite" />
-              </circle>
-            )}
-            {ml && (
-              <text
-                x={h.cx}
-                y={h.cy - 14}
-                fill={SEV_COLOR[h.sev]}
-                fontSize="7.5"
-                textAnchor="middle"
-                fontFamily="DM Mono, monospace"
-                fontWeight="700"
-                opacity="0.95"
-              >
-                {ml.score}
-              </text>
-            )}
-          </g>
-        )
-      })}
-
-      {/* India ports */}
-      {ports.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.cx} cy={p.cy} r="3" fill="#00d4ff" opacity="0.9" />
-          <circle cx={p.cx} cy={p.cy} r="6" fill="none" stroke="#00d4ff" strokeWidth="0.8" opacity="0.3" />
-          <text x={p.cx + 8} y={p.cy + 3} fill="#00d4ff" fontSize="7" opacity="0.8" fontFamily="DM Mono, monospace">
-            {p.label}
-          </text>
-        </g>
-      ))}
-
-      {/* Chokepoint labels */}
-      <text x="316" y="196" fill="#ef4444" fontSize="7" opacity="0.9" fontFamily="DM Mono, monospace">RED SEA ⚡</text>
-      <text x="318" y="155" fill="#f59e0b" fontSize="7" opacity="0.85" fontFamily="DM Mono, monospace">SUEZ ⚠</text>
-      <text x="534" y="244" fill="#f97316" fontSize="7" opacity="0.85" fontFamily="DM Mono, monospace">MALACCA ⚠</text>
-      <text x="422" y="246" fill="#f59e0b" fontSize="7" opacity="0.85" fontFamily="DM Mono, monospace">COLOMBO ⚠</text>
-      <text x="148" y="230" fill="#f97316" fontSize="7" opacity="0.8" fontFamily="DM Mono, monospace">PANAMA ⚠</text>
-      <text x="223" y="323" fill="#22c55e" fontSize="7" opacity="0.75" fontFamily="DM Mono, monospace">CAPE ✓</text>
-
-      {/* Legend */}
-      <g transform="translate(16,366)">
-        <rect width="330" height="22" fill="#07111e" opacity="0.8" rx="3" />
-        {[["#ef4444", "CRITICAL", 0], ["#f59e0b", "HIGH", 68], ["#f97316", "MEDIUM", 104], ["#22c55e", "LOW", 158]].map(([c, l, x]) => (
-          <g key={l as string} transform={`translate(${x},0)`}>
-            <circle cx="8" cy="11" r="4" fill={c as string} />
-            <text x="16" y="15" fill="#8ba0bc" fontSize="7.5" fontFamily="DM Mono, monospace">
-              {l as string}
-            </text>
-          </g>
-        ))}
-        <line x1="210" y1="11" x2="228" y2="11" stroke="#00d4ff" strokeWidth="1.5" strokeDasharray="4,2" />
-        <text x="232" y="15" fill="#8ba0bc" fontSize="7.5" fontFamily="DM Mono, monospace">TRADE ROUTE</text>
-      </g>
-    </svg>
-  )
-}
-
 // ─── Analytics Page ───────────────────────────────────────────────────────────
 
 // Replaces the old shipping/freight AnalyticsPage. Everything here is
@@ -611,7 +429,7 @@ function AnalyticsPage({
           Redistribution Activity
         </span>
         <span className="mono" style={{ fontSize: 11, color: "var(--text)" }}>{totalSuggestions} suggested</span>
-        <span className="mono" style={{ fontSize: 11, color: "#22c55e" }}>{applied} applied</span>
+        <span className="mono" style={{ fontSize: 11, color: "#4fd9b0" }}>{applied} applied</span>
         <span className="mono" style={{ fontSize: 11, color: "var(--primary)" }}>{avgConfidence}% avg confidence</span>
       </div>
 
@@ -623,7 +441,7 @@ function AnalyticsPage({
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>
               {["State", "Facilities", "Avg Risk Score", "Critical"].map(h => (
-                <th key={h} style={{ padding: "8px 16px", fontSize: 9, color: "var(--text-3)", fontFamily: "DM Mono, monospace", letterSpacing: "0.08em", textAlign: "left", fontWeight: 600 }}>
+                <th key={h} style={{ padding: "8px 16px", fontSize: 11, color: "var(--text-2)", fontFamily: "var(--font-ui)", letterSpacing: "0.02em", textAlign: "left", fontWeight: 600 }}>
                   {h}
                 </th>
               ))}
@@ -634,8 +452,8 @@ function AnalyticsPage({
               <tr key={row.state} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
                 <td style={{ padding: "8px 16px", fontSize: 11, color: "var(--text)", fontWeight: 500 }}>{row.state}</td>
                 <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: "var(--text-2)" }}>{row.count}</td>
-                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: row.avgScore >= 65 ? "#ef4444" : "var(--text-2)" }}>{row.avgScore}</td>
-                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: row.critical > 0 ? "#ef4444" : "var(--text-3)" }}>{row.critical}</td>
+                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: row.avgScore >= 65 ? "#ef5b68" : "var(--text-2)" }}>{row.avgScore}</td>
+                <td className="mono" style={{ padding: "8px 16px", fontSize: 11, color: row.critical > 0 ? "#ef5b68" : "var(--text-3)" }}>{row.critical}</td>
               </tr>
             ))}
             {stateRows.length === 0 && (
@@ -749,7 +567,7 @@ function RoutePlannerPage({
                 borderRadius: 4,
                 color: "var(--text)",
                 fontSize: 12,
-                fontFamily: "Outfit, sans-serif",
+                fontFamily: "var(--font-ui)",
                 cursor: "pointer",
               }}
             >
@@ -785,7 +603,7 @@ function RoutePlannerPage({
               opacity: !selectedPhcId ? 0.5 : generatingPhcId === selectedPhcId ? 0.6 : 1,
             }}
           >
-            {generatingPhcId === selectedPhcId ? "FINDING OPTIONS…" : "FIND REDISTRIBUTION OPTIONS"}
+            {generatingPhcId === selectedPhcId ? "Finding options…" : "Find redistribution options"}
           </button>
 
           {selectedPhc && (
@@ -849,8 +667,8 @@ function RoutePlannerPage({
                 key={rr.id}
                 style={{
                   background: "var(--panel)",
-                  border: `1px solid ${rr.applied ? "#22c55e60" : "var(--border)"}`,
-                  borderLeft: "2px solid #22c55e",
+                  border: `1px solid ${rr.applied ? "#4fd9b060" : "var(--border)"}`,
+                  borderLeft: "2px solid #4fd9b0",
                   borderRadius: 6,
                   padding: 16,
                 }}
@@ -864,9 +682,9 @@ function RoutePlannerPage({
                       style={{
                         fontSize: 8,
                         fontWeight: 700,
-                        color: "#22c55e",
+                        color: "#4fd9b0",
                         padding: "2px 6px",
-                        background: "rgba(34,197,94,0.1)",
+                        background: "rgba(79,217,176,0.1)",
                         borderRadius: 3,
                         letterSpacing: "0.08em",
                       }}
@@ -1146,7 +964,7 @@ function StockPage({ stocks, phcs }: { stocks: ResourceStockView[]; phcs: PHCEnt
                     BEDS {s.bedOccupied}/{s.bedTotal} ({bedPct}%)
                   </div>
                   <div style={{ height: 4, background: "var(--panel-2)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: `${bedPct}%`, height: "100%", background: "#38bdf8" }} />
+                    <div style={{ width: `${bedPct}%`, height: "100%", background: "#5ab8c9" }} />
                   </div>
                 </div>
                 <div>
@@ -1154,7 +972,7 @@ function StockPage({ stocks, phcs }: { stocks: ResourceStockView[]; phcs: PHCEnt
                     STAFF {s.staffPresent}/{s.staffTotal} ({staffPct}%)
                   </div>
                   <div style={{ height: 4, background: "var(--panel-2)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: `${staffPct}%`, height: "100%", background: "#a78bfa" }} />
+                    <div style={{ width: `${staffPct}%`, height: "100%", background: "#8b7fd4" }} />
                   </div>
                 </div>
               </div>
@@ -1442,9 +1260,9 @@ function SettingsPage() {
                 style={{
                   fontSize: 9,
                   fontWeight: 600,
-                  color: status === "Active" ? "#22c55e" : "#f59e0b",
+                  color: status === "Active" ? "#4fd9b0" : "#f5b942",
                   padding: "2px 6px",
-                  background: status === "Active" ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
+                  background: status === "Active" ? "rgba(79,217,176,0.1)" : "rgba(245,185,66,0.1)",
                   borderRadius: 3,
                 }}
               >
@@ -1460,7 +1278,7 @@ function SettingsPage() {
           onClick={save}
           style={{
             padding: "9px 24px",
-            background: saved ? "#22c55e" : "var(--primary)",
+            background: saved ? "#4fd9b0" : "var(--primary)",
             color: "#000",
             fontWeight: 700,
             fontSize: 11,
@@ -1472,7 +1290,7 @@ function SettingsPage() {
             transition: "background 0.3s",
           }}
         >
-          {saved ? "SAVED ✓" : "SAVE SETTINGS"}
+          {saved ? "Saved ✓" : "Save settings"}
         </button>
       </div>
     </div>
@@ -1556,8 +1374,8 @@ function DashboardView({
               <div
                 style={{
                   padding: "3px 8px",
-                  background: "rgba(0,212,255,0.07)",
-                  border: "1px solid rgba(0,212,255,0.22)",
+                  background: "rgba(54,199,165,0.07)",
+                  border: "1px solid rgba(54,199,165,0.22)",
                   borderRadius: 4,
                   display: "flex",
                   alignItems: "center",
@@ -1583,57 +1401,53 @@ function DashboardView({
         </div>
 
         {/* Stats row */}
-        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 12, padding: "16px 16px 0", flexShrink: 0 }}>
           {dashboardStats.map((s, i) => {
             const isNeg = s.delta?.startsWith("−") || s.delta?.startsWith("-")
             return (
-              <div key={i} style={{ padding: "10px 14px", borderRight: "1px solid var(--border)", flex: 1 }}>
+              <div key={i} className="glass-card" style={{ padding: "14px 16px", flex: 1 }}>
                 <div
                   style={{
-                    fontSize: 9,
-                    color: "var(--text-3)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom: 3,
-                    fontWeight: 600,
+                    fontSize: 12,
+                    color: "var(--text-2)",
+                    fontWeight: 500,
+                    marginBottom: 8,
                   }}
                 >
                   {s.label}
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <span className="mono" style={{ fontSize: 20, fontWeight: 500, color: "var(--text)", letterSpacing: "-0.02em" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span className="mono" style={{ fontSize: 24, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.02em" }}>
                     {s.value}
                   </span>
                   {s.delta && (
-                    <span className="mono" style={{ fontSize: 9, color: isNeg ? "#ef4444" : "#22c55e" }}>
+                    <span className="mono" style={{ fontSize: 11, color: isNeg ? "#ef5b68" : "#4fd9b0" }}>
                       {s.delta}
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 9, color: "var(--text-3)", marginTop: 1 }}>{s.sub}</div>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>{s.sub}</div>
               </div>
             )
           })}
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+        <div style={{ display: "flex", borderBottom: "1px solid var(--border)", flexShrink: 0, padding: "16px 16px 0", gap: 4 }}>
           {(["alerts", "watchlist"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                padding: "7px 16px",
+                padding: "9px 16px",
                 background: "transparent",
                 border: "none",
                 borderBottom: `2px solid ${activeTab === tab ? "var(--primary)" : "transparent"}`,
-                color: activeTab === tab ? "var(--primary)" : "var(--text-3)",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
+                color: activeTab === tab ? "var(--primary)" : "var(--text-2)",
+                fontSize: 13,
+                fontWeight: 500,
                 cursor: "pointer",
-                textTransform: "uppercase",
-                fontFamily: "DM Mono, monospace",
+                fontFamily: "var(--font-ui)",
               }}
             >
               {tab === "alerts" ? `Health Alerts (${liveAlerts.length})` : `PHC Watchlist (${routes.filter(r => r.watched).length})`}
@@ -1778,7 +1592,7 @@ function DashboardView({
                         fontSize: 9,
                         fontFamily: "DM Mono, monospace",
                         padding: "2px 7px",
-                        background: r.watched ? "rgba(0,212,255,0.12)" : "transparent",
+                        background: r.watched ? "rgba(54,199,165,0.12)" : "transparent",
                         color: r.watched ? "var(--primary)" : "var(--text-3)",
                         border: `1px solid ${r.watched ? "var(--primary)40" : "var(--border)"}`,
                         borderRadius: 3,
@@ -1795,96 +1609,94 @@ function DashboardView({
 
       {/* Right: AI Redistribution + ML Panel */}
       <div style={{ width: 300, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", flexShrink: 0, background: "var(--panel)" }}>
-        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-2)", textTransform: "uppercase" }}>
+        <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
             AI Redistribution
           </span>
-          <span className="mono" style={{ marginLeft: "auto", fontSize: 9, color: "#22c55e" }}>
+          <span className="mono" style={{ marginLeft: "auto", fontSize: 11, color: "#4fd9b0" }}>
             {reroutes.filter(r => !r.applied && !r.dismissed).length} suggestions
           </span>
         </div>
-        <div style={{ padding: "8px 14px 0" }}>
+        <div style={{ padding: "12px 16px 0" }}>
           <button
             onClick={onGenerateReroutes}
             disabled={generatingReroutes}
             style={{
               width: "100%",
-              padding: "6px 10px",
-              fontSize: 9,
-              fontFamily: "DM Mono, monospace",
-              fontWeight: 700,
-              letterSpacing: "0.06em",
+              padding: "9px 10px",
+              fontSize: 12,
+              fontFamily: "var(--font-ui)",
+              fontWeight: 600,
               background: "var(--primary-dim)",
               color: "var(--primary)",
-              border: "1px solid var(--primary)40",
-              borderRadius: 4,
+              border: "1px solid rgba(54,199,165,0.3)",
+              borderRadius: 8,
               cursor: generatingReroutes ? "default" : "pointer",
               opacity: generatingReroutes ? 0.6 : 1,
             }}
           >
-            {generatingReroutes ? "GENERATING…" : "⟳ GENERATE SUGGESTIONS"}
+            {generatingReroutes ? "Generating…" : "⟳ Generate suggestions"}
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", paddingTop: 10 }}>
+        <div style={{ flex: 1, overflowY: "auto", paddingTop: 12 }}>
           {reroutes
             .filter(r => !r.dismissed)
             .map(rr => (
               <div
                 key={rr.id}
+                className="glass-card"
                 style={{
-                  margin: "0 12px 10px",
-                  padding: "10px 12px",
-                  background: rr.applied ? "rgba(34,197,94,0.06)" : "var(--panel-2)",
-                  border: `1px solid ${rr.applied ? "#22c55e40" : "var(--border)"}`,
-                  borderRadius: 5,
-                  borderLeft: "2px solid #22c55e",
+                  margin: "0 16px 12px",
+                  padding: "12px 14px",
+                  borderLeft: "2px solid #4fd9b0",
+                  borderRadius: 10,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                  <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 700, letterSpacing: "0.08em" }}>
-                    {rr.applied ? "✓ APPLIED" : "AI SUGGESTION"}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: "#4fd9b0", fontWeight: 600 }}>
+                    {rr.applied ? "✓ Applied" : "AI suggestion"}
                   </span>
-                  <span className="mono" style={{ marginLeft: "auto", fontSize: 9, color: "#22c55e" }}>
+                  <span className="mono" style={{ marginLeft: "auto", fontSize: 11, color: "#4fd9b0" }}>
                     {rr.confidence}% conf.
                   </span>
                 </div>
-                <div className="mono" style={{ fontSize: 9, color: "var(--text-3)", marginBottom: 2 }}>
+                <div className="mono" style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 3 }}>
                   {rr.resourceType} · {rr.quantity} units
                 </div>
-                <div className="mono" style={{ fontSize: 10, color: "var(--text)", fontWeight: 500, marginBottom: 4 }}>
+                <div className="mono" style={{ fontSize: 12, color: "var(--text)", fontWeight: 500, marginBottom: 6 }}>
                   {rr.fromPhc} → {rr.toPhc}
                 </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                  <span className="mono" style={{ fontSize: 9, color: "#f59e0b" }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+                  <span className="mono" style={{ fontSize: 11, color: "#f5b942" }}>
                     +{rr.extraHours}h
                   </span>
-                  <span className="mono" style={{ fontSize: 9, color: "#f59e0b" }}>
+                  <span className="mono" style={{ fontSize: 11, color: "#f5b942" }}>
                     {rr.extraCost}
                   </span>
                 </div>
-                <div style={{ fontSize: 10, color: "var(--text-3)", lineHeight: 1.5, marginBottom: rr.applied ? 0 : 10 }}>{rr.reason}</div>
+                <div style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.5, marginBottom: rr.applied ? 0 : 12 }}>{rr.reason}</div>
                 {!rr.applied && (
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
                     <Btn small onClick={() => onApplyReroute(rr.id)}>
-                      APPLY
+                      Apply
                     </Btn>
                     <Btn small danger onClick={() => onDismissReroute(rr.id)}>
-                      DISMISS
+                      Dismiss
                     </Btn>
                   </div>
                 )}
               </div>
             ))}
           {reroutes.filter(r => !r.dismissed).length === 0 && (
-            <div style={{ padding: 20, textAlign: "center", fontSize: 11, color: "var(--text-3)" }}>All suggestions processed.</div>
+            <div style={{ padding: 24, textAlign: "center", fontSize: 12, color: "var(--text-3)" }}>All suggestions processed.</div>
           )}
         </div>
 
         {/* ML Risk Engine */}
-        <div style={{ borderTop: "1px solid var(--border)", padding: "12px 14px" }}>
+        <div style={{ borderTop: "1px solid var(--border)", padding: "14px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "var(--text-3)", textTransform: "uppercase" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
               ML Risk Engine
             </span>
             {mlRunning ? (
@@ -1892,7 +1704,7 @@ function DashboardView({
                 ◉ RUNNING
               </span>
             ) : Object.keys(mlScores).length > 0 ? (
-              <span className="mono" style={{ fontSize: 8, color: "#22c55e" }}>
+              <span className="mono" style={{ fontSize: 8, color: "#4fd9b0" }}>
                 ✓ SCORED
               </span>
             ) : null}
@@ -1930,7 +1742,7 @@ function DashboardView({
           {aiAnalysis ? (
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#22c55e", letterSpacing: "0.08em" }}>✦ GROQ AI · LLAMA 3.3</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#4fd9b0", letterSpacing: "0.08em" }}>✦ GROQ AI · LLAMA 3.3</span>
                 <button
                   onClick={onGenerateAI}
                   style={{
@@ -1964,7 +1776,7 @@ function DashboardView({
                         height: 2,
                         borderRadius: 1,
                         marginBottom: 5,
-                        background: "linear-gradient(90deg, #1a2d42 0%, #243447 50%, #1a2d42 100%)",
+                        background: "linear-gradient(90deg, #1c2530 0%, #242e3b 50%, #1c2530 100%)",
                         backgroundSize: "200% 100%",
                         animation: "shimmer 1.4s ease infinite",
                         width: `${w}%`,
@@ -1981,93 +1793,6 @@ function DashboardView({
           <span className="mono" style={{ fontSize: 7, color: "var(--text-3)" }}>
             sigmoid risk · z-score anomaly · LR forecast · groq llama-3.3
           </span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Full Map Page ─────────────────────────────────────────────────────────────
-
-function MapPage({
-  activeAlert,
-  setActiveAlert,
-  alerts,
-  mlScores,
-}: {
-  activeAlert: number | null
-  setActiveAlert: (id: number | null) => void
-  alerts: AlertEvent[]
-  mlScores: Record<number, MLScore>
-}) {
-  return (
-    <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-      <div style={{ flex: 1, position: "relative" }}>
-        <WorldMap activeAlert={activeAlert} mlScores={mlScores} fullscreen />
-        <div style={{ position: "absolute", top: 12, left: 12 }}>
-          <div
-            style={{
-              padding: "5px 10px",
-              background: "rgba(7,10,17,0.9)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
-              color: "var(--text-3)",
-            }}
-          >
-            FULL MAP VIEW · INDIA TRADE CORRIDORS
-          </div>
-        </div>
-      </div>
-      <div style={{ width: 260, borderLeft: "1px solid var(--border)", background: "var(--panel)", display: "flex", flexDirection: "column" }}>
-        <div
-          style={{
-            padding: "10px 14px",
-            borderBottom: "1px solid var(--border)",
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.1em",
-            color: "var(--text-3)",
-            textTransform: "uppercase",
-          }}
-        >
-          Active Events
-        </div>
-        <div style={{ flex: 1, overflowY: "auto" }}>
-          {alerts
-            .filter(a => !a.dismissed)
-            .map(a => {
-              const ml = mlScores[a.id]
-              return (
-                <div
-                  key={a.id}
-                  onClick={() => setActiveAlert(activeAlert === a.id ? null : a.id)}
-                  style={{
-                    padding: "10px 14px",
-                    borderBottom: "1px solid var(--border)",
-                    cursor: "pointer",
-                    background: activeAlert === a.id ? SEV_BG[a.severity] : "transparent",
-                    borderLeft: `2px solid ${activeAlert === a.id ? SEV_COLOR[a.severity] : "transparent"}`,
-                  }}
-                >
-                  <div style={{ display: "flex", gap: 6, marginBottom: 4, alignItems: "center" }}>
-                    <SeverityBadge sev={a.severity} />
-                    <span className="mono" style={{ fontSize: 8, color: "var(--text-3)" }}>
-                      {a.time}
-                    </span>
-                    {ml && (
-                      <span className="mono" style={{ marginLeft: "auto", fontSize: 8, color: SEV_COLOR[a.severity] }}>
-                        ML {ml.score}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 600 }}>{a.location}</div>
-                  <div style={{ fontSize: 10, color: "var(--text-3)", marginTop: 2 }}>{a.type}</div>
-                </div>
-              )
-            })}
         </div>
       </div>
     </div>
@@ -2302,26 +2027,26 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 4, cursor: "pointer" }} onClick={() => setPage("dashboard")}>
           <div
             style={{
-              width: 26,
-              height: 26,
-              background: "linear-gradient(135deg, #00d4ff 0%, #0066ff 100%)",
-              borderRadius: 5,
+              width: 28,
+              height: 28,
+              background: "linear-gradient(135deg, #36c7a5 0%, #1f8f76 100%)",
+              borderRadius: 7,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: "DM Mono, monospace" }}>P</span>
+            <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-ui)" }}>P</span>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.01em" }}>PHC-Nexus</span>
-          <span style={{ fontSize: 9, color: "var(--text-3)", letterSpacing: "0.1em", fontWeight: 600 }}>SUPPLY CHAIN INTELLIGENCE</span>
+          <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.015em", color: "var(--text)" }}>PHC-Nexus</span>
+          <span style={{ fontSize: 10, color: "var(--text-3)", letterSpacing: "0.08em", fontWeight: 500 }}>Supply Chain Intelligence</span>
         </div>
 
         <div style={{ width: 1, height: 20, background: "var(--border)" }} />
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <LiveDot />
-          <span className="mono" style={{ fontSize: 10, color: "#22c55e", fontWeight: 500 }}>
+          <span className="mono" style={{ fontSize: 10, color: "#4fd9b0", fontWeight: 500 }}>
             LIVE
           </span>
         </div>
@@ -2333,8 +2058,8 @@ export default function App() {
               display: "flex",
               alignItems: "center",
               gap: 6,
-              background: "rgba(239,68,68,0.08)",
-              border: "1px solid rgba(239,68,68,0.25)",
+              background: "rgba(239,91,104,0.08)",
+              border: "1px solid rgba(239,91,104,0.25)",
               padding: "3px 9px",
               borderRadius: 4,
               cursor: "pointer",
@@ -2345,12 +2070,12 @@ export default function App() {
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: "#ef4444",
+                background: "#ef5b68",
                 display: "inline-block",
                 animation: "blink 1.2s ease infinite",
               }}
             />
-            <span className="mono" style={{ fontSize: 10, color: "#ef4444" }}>
+            <span className="mono" style={{ fontSize: 10, color: "#ef5b68" }}>
               {liveCount} ACTIVE ALERTS
             </span>
           </button>
@@ -2363,8 +2088,8 @@ export default function App() {
               alignItems: "center",
               gap: 5,
               padding: "3px 8px",
-              background: "rgba(0,212,255,0.05)",
-              border: "1px solid rgba(0,212,255,0.18)",
+              background: "rgba(54,199,165,0.05)",
+              border: "1px solid rgba(54,199,165,0.18)",
               borderRadius: 4,
             }}
           >
@@ -2394,7 +2119,7 @@ export default function App() {
                 borderRadius: 4,
                 color: "var(--text)",
                 fontSize: 11,
-                fontFamily: "Outfit, sans-serif",
+                fontFamily: "var(--font-ui)",
                 outline: "none",
               }}
             />
@@ -2406,13 +2131,13 @@ export default function App() {
                 background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: 4,
-                color: "var(--text-3)",
-                fontSize: 10,
-                fontFamily: "DM Mono, monospace",
+                color: "var(--text-2)",
+                fontSize: 12,
+                fontFamily: "var(--font-ui)",
                 cursor: "pointer",
               }}
             >
-              ⌕ SEARCH
+              ⌕ Search
             </button>
           )}
         </div>
@@ -2423,18 +2148,18 @@ export default function App() {
           </span>
           <button
             style={{
-              padding: "4px 10px",
+              padding: "5px 12px",
               background: "transparent",
               border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--text-3)",
-              fontSize: 10,
-              fontFamily: "DM Mono, monospace",
+              borderRadius: 6,
+              color: "var(--text-2)",
+              fontSize: 12,
+              fontFamily: "var(--font-ui)",
               cursor: "pointer",
             }}
             onClick={() => setPage("settings")}
           >
-            ⚙ CONFIG
+            ⚙ Config
           </button>
           <div
             style={{
@@ -2453,7 +2178,7 @@ export default function App() {
                 width: 22,
                 height: 22,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #00d4ff, #0066ff)",
+                background: "linear-gradient(135deg, #36c7a5, #1f8f76)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -2467,18 +2192,16 @@ export default function App() {
 
       {(dataLoading || dataError) && (
         <div
+          className="glass-card"
           style={{
             position: "fixed",
-            top: 50,
-            right: 16,
+            bottom: 20,
+            left: navCollapsed ? 72 : 188,
             zIndex: 50,
-            padding: "6px 12px",
-            background: dataError ? "rgba(239,68,68,0.15)" : "rgba(0,212,255,0.1)",
-            border: `1px solid ${dataError ? "#ef444460" : "var(--primary)40"}`,
-            borderRadius: 4,
-            fontSize: 10,
-            fontFamily: "DM Mono, monospace",
-            color: dataError ? "#ef4444" : "var(--primary)",
+            padding: "8px 14px",
+            fontSize: 12,
+            color: dataError ? "#ef5b68" : "var(--primary)",
+            borderColor: dataError ? "rgba(239,91,104,0.35)" : "rgba(54,199,165,0.3)",
           }}
         >
           {dataError ? `Backend error: ${dataError}` : "Loading live data…"}
@@ -2489,12 +2212,12 @@ export default function App() {
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         <nav
           style={{
-            width: navCollapsed ? 48 : 180,
+            width: navCollapsed ? 52 : 168,
             borderRight: "1px solid var(--border)",
             display: "flex",
             flexDirection: "column",
-            padding: "12px 0",
-            gap: 4,
+            padding: "16px 0",
+            gap: 2,
             flexShrink: 0,
             background: "var(--panel)",
             transition: "width 0.15s",
@@ -2531,23 +2254,24 @@ export default function App() {
                 position: "relative",
                 width: navCollapsed ? 36 : "calc(100% - 16px)",
                 margin: navCollapsed ? 0 : "0 8px",
-                height: 36,
-                borderRadius: 6,
+                height: 38,
+                borderRadius: 8,
                 border: "none",
+                borderLeft: !navCollapsed && page === item.id ? "2px solid var(--primary)" : "2px solid transparent",
                 cursor: "pointer",
                 background: page === item.id ? "var(--primary-dim)" : "transparent",
-                color: page === item.id ? "var(--primary)" : "var(--text-3)",
+                color: page === item.id ? "var(--primary)" : "var(--text-2)",
                 fontSize: 14,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: navCollapsed ? "center" : "flex-start",
                 gap: 10,
                 padding: navCollapsed ? 0 : "0 10px",
-                transition: "all 0.15s",
+                transition: "background 0.15s, color 0.15s",
               }}
             >
               <span>{item.icon}</span>
-              {!navCollapsed && <span style={{ fontSize: 11, fontWeight: 500, fontFamily: "Outfit, sans-serif" }}>{item.label}</span>}
+              {!navCollapsed && <span style={{ fontSize: 13, fontWeight: 500, fontFamily: "var(--font-ui)" }}>{item.label}</span>}
               {item.badge != null && item.badge > 0 && (
                 <span
                   style={{
@@ -2558,7 +2282,7 @@ export default function App() {
                     width: 14,
                     height: 14,
                     borderRadius: "50%",
-                    background: "#ef4444",
+                    background: "#ef5b68",
                     fontSize: 8,
                     fontWeight: 700,
                     fontFamily: "DM Mono, monospace",
@@ -2573,6 +2297,34 @@ export default function App() {
               )}
             </button>
           ))}
+
+          <div
+            style={{
+              marginTop: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: navCollapsed ? "10px 0" : "10px 18px",
+              justifyContent: navCollapsed ? "center" : "flex-start",
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "var(--success)",
+                flexShrink: 0,
+                boxShadow: "0 0 0 3px var(--success-dim)",
+              }}
+            />
+            {!navCollapsed && (
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+                <span style={{ fontSize: 10, color: "var(--text-3)", fontWeight: 600, letterSpacing: "0.06em" }}>SYSTEM</span>
+                <span style={{ fontSize: 11, color: "var(--text-2)", fontWeight: 500 }}>Operational</span>
+              </div>
+            )}
+          </div>
         </nav>
 
         {page === "dashboard" && (

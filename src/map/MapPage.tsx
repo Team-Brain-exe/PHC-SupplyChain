@@ -17,10 +17,10 @@ import type { PHC } from "../services/project44";
 type Severity = "critical" | "high" | "medium" | "low";
 
 function severityColor(sev: Severity): string {
-  if (sev === "critical") return "#ef4444";
-  if (sev === "high") return "#f59e0b";
-  if (sev === "medium") return "#f97316";
-  return "#22c55e";
+  if (sev === "critical") return "#ef5b68";
+  if (sev === "high") return "#f5b942";
+  if (sev === "medium") return "#e8935a";
+  return "#4fd9b0";
 }
 
 function buildGraticule(): LatLngExpression[][] {
@@ -97,22 +97,20 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
     >
       {/* Map title */}
       <div
+        className="glass-card"
         style={{
           position: "absolute",
           zIndex: 1000,
-          top: 12,
-          left: 12,
-          padding: "5px 10px",
-          background: "rgba(7,10,17,0.92)",
-          border: "1px solid var(--border)",
-          borderRadius: 4,
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: "0.1em",
-          color: "var(--text-3)",
+          top: 14,
+          left: 14,
+          padding: "7px 14px",
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: "-0.005em",
+          color: "var(--text)",
         }}
       >
-        PHC NETWORK MAP · INDIA
+        PHC Network · India
       </div>
 
       {/* Live status */}
@@ -120,22 +118,20 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
         style={{
           position: "absolute",
           zIndex: 1000,
-          top: 12,
-          right: 12,
+          top: 14,
+          right: 14,
           display: "flex",
           gap: 8,
           alignItems: "center",
         }}
       >
         <div
+          className="glass-card"
           style={{
-            padding: "4px 8px",
-            background: "rgba(7,10,17,0.9)",
-            border: "1px solid var(--border)",
-            borderRadius: 4,
+            padding: "6px 12px",
             display: "flex",
             alignItems: "center",
-            gap: 6,
+            gap: 7,
           }}
         >
           <span
@@ -143,65 +139,60 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "#22c55e",
+              background: "#4fd9b0",
+              boxShadow: "0 0 0 3px rgba(79,217,176,0.18)",
               display: "inline-block",
             }}
           />
 
           <span
-            className="mono"
             style={{
-              fontSize: 8,
-              color: "#22c55e",
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#4fd9b0",
             }}
           >
-            LIVE
+            Live
           </span>
         </div>
 
         {phcs.length === 0 && (
           <div
-            className="mono"
+            className="glass-card"
             style={{
-              padding: "4px 8px",
-              background: "rgba(7,10,17,0.9)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              fontSize: 8,
-              color: "var(--text-3)",
+              padding: "6px 12px",
+              fontSize: 11,
+              color: "var(--text-2)",
             }}
           >
-            SYNCING DATA…
+            Syncing data…
           </div>
         )}
       </div>
 
       {/* Legend */}
       <div
+        className="glass-card"
         style={{
           position: "absolute",
           zIndex: 1000,
-          bottom: 14,
-          left: 14,
-          padding: "8px 10px",
-          background: "rgba(7,10,17,0.92)",
-          border: "1px solid var(--border)",
-          borderRadius: 5,
+          bottom: 16,
+          left: 16,
+          padding: "10px 14px",
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: 14,
           flexWrap: "wrap",
         }}
       >
         <span
-          className="mono"
           style={{
-            fontSize: 8,
-            color: "var(--text-3)",
-            fontWeight: 700,
+            fontSize: 11,
+            color: "var(--text-2)",
+            fontWeight: 600,
           }}
         >
-          RISK
+          Risk
         </span>
 
         {(["critical", "high", "medium", "low"] as Severity[]).map((severity) => (
@@ -210,7 +201,7 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 4,
+              gap: 5,
             }}
           >
             <span
@@ -223,11 +214,10 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
             />
 
             <span
-              className="mono"
               style={{
-                fontSize: 8,
-                color: "var(--text-3)",
-                textTransform: "uppercase",
+                fontSize: 11,
+                color: "var(--text-2)",
+                textTransform: "capitalize",
               }}
             >
               {severity} ({counts[severity]})
@@ -238,19 +228,20 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
         <span
           style={{
             width: 1,
-            height: 12,
-            background: "var(--border)",
+            height: 14,
+            background: "var(--border-light)",
           }}
         />
 
         <span
           className="mono"
           style={{
-            fontSize: 8,
-            color: "#38bdf8",
+            fontSize: 11,
+            color: "var(--primary)",
+            fontWeight: 500,
           }}
         >
-          ● {phcs.length} PHCs MONITORED
+          ● {phcs.length} PHCs monitored
         </span>
       </div>
 
@@ -265,14 +256,15 @@ export function LiveMapCanvas({ phcs }: { phcs: PHC[] }) {
           width: "100%",
           height: "100%",
           minHeight: 0,
-          background: "#07111e",
+          background: "#080b12",
         }}
       >
         <InvalidateMapSize />
 
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+          className="map-tiles-dark"
         />
 
         {/* Graticule */}
