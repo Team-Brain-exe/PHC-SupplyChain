@@ -2039,7 +2039,7 @@ export default function App() {
             <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-ui)" }}>P</span>
           </div>
           <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.015em", color: "var(--text)" }}>PHC-Nexus</span>
-          <span style={{ fontSize: 10, color: "var(--text-3)", letterSpacing: "0.08em", fontWeight: 500 }}>Supply Chain Intelligence</span>
+          <span style={{ fontSize: 10, color: "var(--text-3)", letterSpacing: "0.08em", fontWeight: 500 }}>PHC Supply Chain Intelligence</span>
         </div>
 
         <div style={{ width: 1, height: 20, background: "var(--border)" }} />
